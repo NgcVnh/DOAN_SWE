@@ -1,12 +1,20 @@
-
 {
-  "name": "my-monorepo",
+  "name": "brewlite-monorepo",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:frontend": "npm --prefix frontend run dev",
-    "dev:backend": "npm --prefix backend run start:dev",
-    "build:frontend": "npm --prefix frontend run build",
-    "build:backend": "npm --prefix backend run build"
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "dev:frontend": "npm run dev:web",
+    "dev:backend": "npm run dev:api",
+    "build:web": "npm --prefix apps/web run build",
+    "build:api": "npm --prefix apps/api run build",
+    "build:frontend": "npm run build:web",
+    "build:backend": "npm run build:api",
+    "build": "npm run build:api",
+    "test": "npm --prefix apps/api run test"
+  },
+  "dependencies": {
+    "zustand": "^5.0.3"
   }
 }

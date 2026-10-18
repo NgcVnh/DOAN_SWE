@@ -1,185 +1,94 @@
-#  DOAN_SWE — Full-Stack Monorepo
+# BrewLite — Mobile-First Coffee & Beverage Ordering Platform
 
 <p align="center">
-  <strong>Modern Web Application with Next.js & NestJS</strong>
+  <strong>Nền tảng đặt đồ uống cà phê trực tuyến hiện đại với kiến trúc Monorepo, Next.js PWA & NestJS Clean Architecture</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Next.js%2015-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" />
-  <img src="https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white" alt="Git" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
 </p>
-
-## 📖 Giới thiệu
-
-**DOAN_SWE** là dự án phát triển phần mềm theo mô hình **Monorepo**, quản lý mã nguồn Frontend và Backend trong cùng một repository.
-
-Dự án sử dụng các công nghệ chính:
-
-- **Frontend:** Next.js, TypeScript.
-- **Backend:** NestJS, TypeScript.
-- **Package Manager:** npm.
-- **Version Control:** Git.
-
-Mục tiêu là tổ chức mã nguồn rõ ràng, thuận tiện cho việc phát triển, kiểm thử và phối hợp giữa các thành viên trong nhóm.
-
-## 🛠️ Công nghệ sử dụng
-
-| Công nghệ | Vai trò |
-|---|---|
-| Next.js | Xây dựng giao diện người dùng |
-| NestJS | Xây dựng API và xử lý nghiệp vụ phía máy chủ |
-| TypeScript | Tăng tính an toàn kiểu dữ liệu |
-| Node.js | Môi trường chạy JavaScript |
-| npm | Quản lý package và thư viện |
-| Git & GitHub | Quản lý phiên bản và cộng tác nhóm |
-
-## 📂 Cấu trúc dự án
-
-```text
-DOAN_SWE/
-├── frontend/           # Next.js application
-├── backend/            # NestJS application
-├── .gitignore          # Files excluded from Git
-├── .env.example        # Environment variable template
-├── package.json        # Root scripts and configuration
-└── README.md            # Project documentation
-```
-
-> Cấu trúc trên mô tả các thư mục và tệp dự kiến ở thư mục gốc. Có thể điều chỉnh theo cấu trúc thực tế của repository.
-
-## ⚙️ Yêu cầu hệ thống
-
-Trước khi bắt đầu, hãy cài đặt:
-
-- [Node.js LTS](https://nodejs.org/)
-- npm (được cài kèm Node.js)
-- [Git](https://git-scm.com/)
-- [Visual Studio Code](https://code.visualstudio.com/) (khuyến nghị)
-
-Kiểm tra phiên bản:
-
-```bash
-node -v
-npm -v
-git --version
-```
-
-## 🚀 Cài đặt và chạy dự án
-
-### 1. Clone repository
-
-```bash
-git clone <REPOSITORY_URL>
-cd DOAN_SWE
-```
-
-Thay `<REPOSITORY_URL>` bằng đường dẫn repository GitHub của dự án.
-
-### 2. Cài đặt và chạy Frontend
-
-Mở terminal tại thư mục gốc dự án:
-
-```bash
-npm --prefix frontend install
-npm run dev:frontend
-```
-
-Frontend sẽ chạy tại:
-
-**http://localhost:3000**
-
-### 3. Cài đặt và chạy Backend
-
-Mở một terminal khác tại thư mục gốc:
-
-```bash
-npm --prefix backend install
-npm run dev:backend
-```
-
-Backend sẽ chạy tại:
-
-**http://localhost:3001**
-
-> Giữ cả hai terminal hoạt động để Frontend và Backend có thể chạy đồng thời.
-
-## 🔐 Cấu hình biến môi trường
-
-Dự án cung cấp file `.env.example` để tham khảo các biến môi trường cần thiết.
-
-1. Kiểm tra nội dung file `.env.example`.
-2. Tạo các file `.env` tại vị trí mà từng ứng dụng yêu cầu.
-3. Điền các giá trị cấu hình phù hợp với môi trường phát triển.
-4. Khởi động lại ứng dụng sau khi thay đổi cấu hình.
-
-**Lưu ý bảo mật:** Không commit mật khẩu, API key, token hoặc thông tin bí mật lên GitHub.
-
-## 🌿 Quy trình làm việc với Git
-
-Cập nhật mã nguồn mới nhất:
-
-```bash
-git pull origin main
-```
-
-Tạo nhánh phát triển:
-
-```bash
-git checkout -b feature/ten-chuc-nang
-```
-
-Lưu thay đổi:
-
-```bash
-git add .
-git commit -m "feat: mô tả chức năng"
-git push origin feature/ten-chuc-nang
-```
-
-Sau đó, tạo **Pull Request** trên GitHub để xem xét và hợp nhất mã nguồn vào nhánh chính.
-
-### Quy ước commit đề xuất
-
-| Prefix | Ý nghĩa |
-|---|---|
-| `feat:` | Thêm chức năng mới |
-| `fix:` | Sửa lỗi |
-| `docs:` | Cập nhật tài liệu |
-| `refactor:` | Tái cấu trúc mã nguồn |
-| `test:` | Thêm hoặc cập nhật kiểm thử |
-| `chore:` | Công việc cấu hình, bảo trì |
-
-## 🧑‍💻 Đóng góp
-
-Các thành viên trong nhóm có thể đóng góp theo quy trình:
-
-1. Cập nhật mã nguồn mới nhất.
-2. Tạo nhánh riêng cho chức năng cần phát triển.
-3. Viết code và kiểm tra trước khi commit.
-4. Push nhánh lên GitHub.
-5. Tạo Pull Request để nhóm xem xét.
-
-## 📌 Trạng thái dự án
-
-- [x] Khởi tạo cấu trúc Monorepo.
-- [x] Sử dụng Next.js cho Frontend.
-- [x] Sử dụng NestJS cho Backend.
-- [x] Sử dụng TypeScript.
-- [ ] Hoàn thiện các chức năng nghiệp vụ.
-- [ ] Hoàn thiện kiểm thử và tài liệu API.
-
-*Các mục trạng thái cần được cập nhật theo tiến độ thực tế của dự án.*
-
-## 📄 License
-
-Dự án được phát triển phục vụ mục đích học tập và đồ án chuyên ngành Kỹ thuật phần mềm (Software Engineering).
 
 ---
 
-<p align="center">
-  <strong>DOAN_SWE</strong><br/>
-  Built with ❤️ using Next.js, NestJS and TypeScript
-</p>
+## 📖 Giới thiệu (Overview)
+
+**BrewLite** là đồ án môn học Kỹ thuật Phần mềm (Software Engineering). Dự án hướng đến việc giải quyết bài toán đặt món và tùy biến đồ uống tại chuỗi cửa hàng cà phê thông qua giải pháp **Mobile-First Progressive Web App (PWA)** kết hợp backend chuẩn **Clean Architecture / Domain-Driven Design (DDD)**.
+
+---
+
+## 📂 Cấu trúc thư mục chuẩn (Project Structure)
+
+```text
+brewlite/
+├── apps/
+│   ├── web/                     # Next.js mobile-first / PWA
+│   └── api/                     # NestJS backend
+├── docs/
+│   ├── requirements/            # Task 1: Đặc tả yêu cầu phần mềm (SRS)
+│   ├── diagrams/                # Task 2: Các biểu đồ UML & ERD (Mermaid)
+│   ├── architecture/            # Task 3: Thiết kế kiến trúc Clean Architecture & Monorepo
+│   ├── traceability-matrix.md   # Ma trận truy vết yêu cầu (Traceability Matrix)
+│   └── deployment.md            # Hướng dẫn triển khai (Local & Cloud)
+├── tests/                       # Bộ kiểm thử tích hợp & E2E
+├── .github/workflows/           # CI/CD GitHub Actions
+├── docker-compose.yml           # Khởi chạy toàn bộ hệ thống bằng Docker
+├── .env.example                 # Mẫu cấu hình biến môi trường
+└── README.md                    # Tài liệu hướng dẫn chính
+```
+
+---
+
+## 📑 Tài liệu chi tiết các Task (Documentation)
+
+- **Task 1 — Đặc tả yêu cầu (Requirements):** Xem chi tiết tại [docs/requirements/README.md](docs/requirements/README.md).
+- **Task 2 — Thiết kế biểu đồ (Diagrams):** Xem chi tiết tại [docs/diagrams/README.md](docs/diagrams/README.md) (Use Case, Sequence, ERD, State Machine).
+- **Task 3 — Thiết kế kiến trúc (Architecture):** Xem chi tiết tại [docs/architecture/README.md](docs/architecture/README.md) (Clean Architecture, DDD, Monorepo).
+- **Ma trận truy vết (Traceability Matrix):** [docs/traceability-matrix.md](docs/traceability-matrix.md).
+- **Hướng dẫn triển khai (Deployment Guide):** [docs/deployment.md](docs/deployment.md).
+
+---
+
+## 🚀 Khởi động nhanh (Quick Start)
+
+### Cách 1: Sử dụng Docker Compose (Khuyến nghị)
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+```
+- **Web App (PWA):** [http://localhost:3000](http://localhost:3000)
+- **API Backend:** [http://localhost:3001](http://localhost:3001)
+
+### Cách 2: Chạy trực tiếp qua npm
+
+1. **Cài đặt thư viện:**
+```bash
+npm install
+npm --prefix apps/api install
+npm --prefix apps/web install
+```
+
+2. **Chạy đồng thời cả Frontend và Backend:**
+```bash
+# Chạy Backend (Port 3001)
+npm run dev:api
+
+# Chạy Frontend Web (Port 3000)
+npm run dev:web
+```
+
+---
+
+## 🧪 Kiểm thử (Testing)
+
+```bash
+# Chạy unit tests backend
+npm --prefix apps/api run test
+
+# Chạy E2E tests
+npm run test
+```
