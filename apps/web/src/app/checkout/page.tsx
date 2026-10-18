@@ -28,21 +28,40 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      // TODO 1: Sinh mã idempotencyKey duy nhất cho lần bấm thanh toán này
-      // Gợi ý: const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = crypto.randomUUID();
 
-      // TODO 2: Gọi API POST `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/payments`
-      // với body JSON gồm: { orderId, method, idempotencyKey, mockSuccess }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          method: method,
+          idempotencyKey: idempotencyKey,
+          mockSuccess: mockSuccess
+        }),
+      });
 
-      // TODO 3: Kiểm tra kết quả trả về từ Backend:
-      // - Nếu trạng thái đơn trả về là 'PAID':
-      //     + Xóa giỏ hàng (clearCart)
-      //     + Cập nhật setOrderPaidResult({ orderId, status: 'PAID' }) để chuyển sang màn hình Xác nhận (#5)
-      // - Nếu trạng thái đơn trả về là 'PAYMENT_FAILED':
-      //     + GIỮ NGUYÊN giỏ hàng (không xóa giỏ hàng!)
-      //     + Gọi setErrorMessage(...) để hiển thị cảnh báo và cho phép khách bấm "Thử lại"
+      const data = await response.json();
+      if(!response.ok) {
+        throw new Error(data.message || 'Thanh toán thất bại');
+      }
 
-      alert('TODO: Hãy tự viết logic gọi API POST /payments trong hàm handleConfirmPayment()!');
+      if(data.orderStatus === 'PAID') {
+        // [Thành công]: Xóa giỏ hàng & chuyển sang màn hình Xác nhận (#5)
+        // (Sau này ghép với Cart Store: clearCart())
+        setOrderPaidResult({
+          orderId: data.orderId,
+          status: 'PAID',
+        });
+      } else {
+        setErrorMessage(
+          data.errorMessage || 'Giao dịch thanh toán bị từ chối. Giỏ hàng của bạn vẫn được giữ nguyên',
+        );
+      }
+
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Có lỗi kết nối tới máy chủ thanh toán';
       setErrorMessage(msg);

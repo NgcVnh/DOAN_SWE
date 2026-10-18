@@ -35,44 +35,90 @@ export class PaymentsService {
     // =========================================================================
     // BƯỚC 1: KIỂM TRA IDEMPOTENCY KEY (Chống thanh toán trùng lặp 2 lần)
     // =========================================================================
-    // TODO 1: Dùng this.prisma.payment.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { order: true } })
-    // Nếu đã tồn tại bản ghi payment với key này, trả về luôn kết quả cũ mà không trừ tiền lần 2.
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey},
+      include: { order: true},
+    });
+
+    if (existingPayment) {
+      return {
+        success: existingPayment.status === PaymentStatus.SUCCESS,
+        isIdempotent: true,
+        orderId: existingPayment.orderId,
+        orderStatus: existingPayment.order.status,
+        payment: existingPayment,
+      }
+    }
 
     // =========================================================================
     // BƯỚC 2: TÌM ĐƠN HÀNG & KIỂM TRA ORDER STATE MACHINE
     // =========================================================================
-    // TODO 2: Dùng this.prisma.order.findUnique({ where: { id: dto.orderId } })
-    // - Nếu không tìm thấy đơn hàng -> throw new NotFoundException(...)
-    // - Kiểm tra trạng thái đơn hàng hiện tại: Chỉ cho phép thanh toán khi order.status
-    //   đang là OrderStatus.PENDING hoặc OrderStatus.PAYMENT_FAILED (cho phép thanh toán lại).
-    //   Nếu đang ở trạng thái khác (PAID, CANCELLED, COMPLETED...) -> throw new BadRequestException(...)
+     const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Không tìm thấy đơn hàng #${dto.orderId}`);
+    }
+
+    // Theo sơ đồ trạng thái mục 9.1: Chỉ PENDING hoặc PAYMENT_FAILED mới được thanh toán
+    const validStatuses: OrderStatus[] = [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED];
+    if (!validStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `Không thể thanh toán cho đơn hàng đang ở trạng thái "${order.status}"`,
+      );
+    }
 
     // =========================================================================
     // BƯỚC 3: GỌI CỔNG THANH TOÁN THEO ĐA HÌNH (POLYMORPHISM)
     // =========================================================================
-    // TODO 3: Lấy strategy tương ứng từ `this.strategies[dto.method]`
-    // Gọi `const gatewayResult = await strategy.charge(order.total, dto.mockSuccess ?? true);`
+    const strategy = this.strategies[dto.method];
+    const gatewayResult = await strategy.charge(order.total, dto.mockSuccess ?? true);
 
     // =========================================================================
     // BƯỚC 4: CẬP NHẬT DATABASE TRONG TRANSACTION (Đảm bảo tính toàn vẹn ACID)
     // =========================================================================
-    // TODO 4: Xác định trạng thái mới:
-    // - Nếu gatewayResult.success === true:
-    //     paymentStatus = PaymentStatus.SUCCESS
-    //     orderStatus   = OrderStatus.PAID
-    // - Nếu gatewayResult.success === false:
-    //     paymentStatus = PaymentStatus.FAILED
-    //     orderStatus   = OrderStatus.PAYMENT_FAILED
-    //
-    // Dùng `await this.prisma.$transaction(async (tx) => { ... })` để:
-    //   1) Tạo bản ghi trong bảng `tx.payment.create(...)`
-    //   2) Cập nhật trạng thái đơn trong bảng `tx.order.update(...)`
-    //   3) (Nếu thành công & order.pointsEarned > 0) Cộng điểm thưởng vào `tx.user.update(...)`
+    const newPaymentStatus = gatewayResult.success ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
+    const newOrderStatus = gatewayResult.success ? OrderStatus.PAID : OrderStatus.PAYMENT_FAILED;
 
+    const result = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          idempotencyKey: dto.idempotencyKey,
+          amount: order.total,
+          method: dto.method,
+          status: newPaymentStatus,
+          transactionRef: gatewayResult.transactionRef ?? null,
+        },
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: order.id },
+        data: { status: newOrderStatus },
+      });
+
+      if (gatewayResult.success && order.pointsEarned > 0) {
+        await tx.user.update({
+          where: { id: order.userId },
+          data: { loyaltyPoints: { increment: order.pointsEarned } },
+        });
+      }
+      return { payment, order: updatedOrder };
+    });
+
+
+    
     // =========================================================================
     // BƯỚC 5: TRẢ KẾT QUẢ VỀ CHO CONTROLLER / FRONTEND
     // =========================================================================
-    throw new BadRequestException('TODO: Hãy hoàn thiện các bước trong PaymentsService.processPayment()');
+    return {
+      success: gatewayResult.success,
+      orderId: result.order.id,
+      orderStatus: result.order.status,
+      payment: result.payment,
+      errorMessage: gatewayResult.errorMessage ?? null,
+    };
   }
 }
 

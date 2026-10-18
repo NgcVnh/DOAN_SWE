@@ -116,6 +116,25 @@ async function main() {
     });
   }
 
+  // 5. Seed Demo Order (Pending) for Checkout test
+  const existingOrder = await prisma.order.findUnique({ where: { id: 1 } });
+  if (!existingOrder) {
+    const demoUser = await prisma.user.findUnique({ where: { email: demoEmail } });
+    if (demoUser) {
+      await prisma.order.create({
+        data: {
+          id: 1,
+          userId: demoUser.id,
+          status: 'PENDING',
+          subtotal: 123000,
+          discountAmount: 0,
+          total: 123000,
+          pointsEarned: 10,
+        },
+      });
+    }
+  }
+
   console.log('Seeding completed successfully!');
 }
 
