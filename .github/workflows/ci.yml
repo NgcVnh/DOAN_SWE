@@ -1,0 +1,40 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Backend Dependencies
+        run: npm --prefix apps/api ci
+
+      - name: Generate Prisma Client
+        run: npm --prefix apps/api run prisma:generate
+
+      - name: Lint & Build Backend
+        run: |
+          npm --prefix apps/api run lint
+          npm --prefix apps/api run build
+
+      - name: Run Backend Unit Tests
+        run: npm --prefix apps/api run test
+
+      - name: Install & Build Frontend
+        run: |
+          npm --prefix apps/web ci
+          npm --prefix apps/web run build
+
