@@ -86,3 +86,4 @@ Frontend được phát triển với **Next.js** và **Tailwind CSS**, thiết 
 3. **PWA & Caching:**
    - Hỗ trợ Manifest (`manifest.json`) và Service Worker để người dùng có thể "Add to Home Screen".
    - Bộ nhớ tạm cho thực đơn giúp khách hàng có thể duyệt đồ uống ngay cả khi mạng chập chờn.
+

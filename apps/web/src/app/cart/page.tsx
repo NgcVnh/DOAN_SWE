@@ -47,7 +47,7 @@ export default function CartPage() {
           </div>
         ) : (
           <>
-            {/* List Cart Items */}
+            {/* List Cart Items (Task 5: Thêm / Sửa số lượng / Xóa) */}
             <div className="space-y-3">
               {items.map((item) => (
                 <div
@@ -82,6 +82,7 @@ export default function CartPage() {
                         {(item.lineTotal || item.unitPrice * item.qty).toLocaleString('vi-VN')} đ
                       </span>
 
+                      {/* Nút tăng/giảm số lượng */}
                       <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden bg-stone-50">
                         <button
                           onClick={() => {
@@ -92,6 +93,7 @@ export default function CartPage() {
                             }
                           }}
                           className="p-1 px-2 text-stone-600 hover:bg-stone-200 transition"
+                          title="Giảm số lượng"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -99,6 +101,7 @@ export default function CartPage() {
                         <button
                           onClick={() => updateQty(item.id, item.qty + 1)}
                           className="p-1 px-2 text-stone-600 hover:bg-stone-200 transition"
+                          title="Tăng số lượng"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -109,7 +112,7 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Price Summary */}
+            {/* Price Summary: Tự tính tổng tiền (Task 5) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-2.5 text-sm">
               <h3 className="font-semibold text-stone-900 pb-1 border-b border-stone-100">Chi tiết thanh toán</h3>
               <div className="flex justify-between text-stone-600">
@@ -117,7 +120,7 @@ export default function CartPage() {
                 <span>{totalAmount.toLocaleString('vi-VN')} đ</span>
               </div>
               <div className="flex justify-between text-stone-600">
-                <span>Phí giao hàng</span>
+                <span>Phí dịch vụ</span>
                 <span className="text-emerald-600 font-medium">Miễn phí</span>
               </div>
               <div className="flex justify-between font-bold text-base text-stone-900 pt-2 border-t border-stone-100">
@@ -129,7 +132,7 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* Sticky Bottom Checkout Bar (Mobile-First) */}
+      {/* Sticky Bottom Bar chuyển sang thanh toán (Task 8 & 9) */}
       {items.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-stone-200 p-4 shadow-lg z-50">
           <div className="max-w-md mx-auto flex items-center justify-between gap-4">
@@ -139,12 +142,12 @@ export default function CartPage() {
                 {totalAmount.toLocaleString('vi-VN')} đ
               </p>
             </div>
-            <button
-              onClick={() => alert('Chức năng đặt hàng đang được xử lý tiếp!')}
+            <Link
+              href="/checkout"
               className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition active:scale-95 text-center"
             >
-              Tiến hành Đặt hàng
-            </button>
+              Tiến hành Thanh toán
+            </Link>
           </div>
         </div>
       )}

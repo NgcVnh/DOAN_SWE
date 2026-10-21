@@ -1,30 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { Products } from './Interfaces/product.interface.js';
-//mock data
+import { PrismaService } from '../prisma/prisma.service.js';
+
 @Injectable()
 export class ProductsService {
-  private readonly products: Products[] = [
-    {
-      id: 1,
-      name: 'Laptop ASUS',
-      price: 15000000,
-      image: 'https://placehold.co/400x300?text=ASUS',
-    },
-    {
-      id: 2,
-      name: 'Laptop Dell',
-      price: 18000000,
-      image: 'https://placehold.co/400x300?text=Dell',
-    },
-    {
-      id: 3,
-      name: 'Chuột Logitech',
-      price: 500000,
-      image: 'https://placehold.co/400x300?text=Logitech',
-    },
-  ];
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(): Products[] {
-    return this.products;
+  /**
+   * Lấy toàn bộ danh sách sản phẩm từ bảng products qua Prisma ORM
+   * Tiêu chí Task 2: NestJS GET /products trả về JSON menu (id, tên, giá, ảnh) từ CSDL
+   */
+  async findAll(): Promise<Products[]> {
+    const products = await this.prisma.product.findMany({
+      orderBy: { id: 'asc' },
+    });
+
+    return products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      image: p.imageUrl || '',
+      description: p.description ?? undefined,
+    }));
   }
 }

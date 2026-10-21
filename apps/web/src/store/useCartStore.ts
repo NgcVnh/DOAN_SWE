@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { COFFEE_PRODUCTS, SIZE_PRICES } from '../data/coffeeProducts';
 
 export interface CartItem {
   id: number;
@@ -11,68 +13,143 @@ export interface CartItem {
   lineTotal: number;
 }
 
+export interface AddToCartPayload {
+  productId: number;
+  name?: string;
+  unitPrice?: number;
+  size: 'S' | 'M' | 'L';
+  qty: number;
+  toppings?: Array<{ id: number; name: string; price: number }>;
+}
+
 interface CartState {
   items: CartItem[];
   totalAmount: number;
   badgeCount: number;
   isLoading: boolean;
-  fetchCart: () => Promise<void>;
-  addToCart: (payload: { productId: number; size: 'S' | 'M' | 'L'; qty: number; toppings?: any[] }) => Promise<void>;
-  updateQty: (cartItemId: number, qty: number) => Promise<void>;
-  removeItem: (cartItemId: number) => Promise<void>;
+  fetchCart: () => void;
+  addToCart: (payload: AddToCartPayload) => void;
+  updateQty: (cartItemId: number, qty: number) => void;
+  removeItem: (cartItemId: number) => void;
+  clearCart: () => void;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Hàm tự động tính tổng tiền và số lượng cho badge theo Task 5
+const computeTotals = (items: CartItem[]) => {
+  const totalAmount = items.reduce(
+    (sum, item) => sum + (item.lineTotal || item.unitPrice * item.qty),
+    0,
+  );
+  const badgeCount = items.reduce((sum, item) => sum + item.qty, 0);
+  return { totalAmount, badgeCount };
+};
 
-export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  totalAmount: 0,
-  badgeCount: 0,
-  isLoading: false,
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      totalAmount: 0,
+      badgeCount: 0,
+      isLoading: false,
 
-  // Lấy dữ liệu giỏ hàng mới nhất từ Backend (GET /cart)
-  fetchCart: async () => {
-    try {
-      set({ isLoading: true });
-      const res = await fetch(`${API_BASE}/cart`);
-      const data = await res.json();
-      set({
-        items: data.items || [],
-        totalAmount: data.totalAmount || 0,
-        badgeCount: data.totalQuantity || data.totalItemsCount || 0,
-        isLoading: false,
-      });
-    } catch (error) {
-      console.error('Lỗi lấy giỏ hàng:', error);
-      set({ isLoading: false });
-    }
-  },
+      fetchCart: () => {
+        const { totalAmount, badgeCount } = computeTotals(get().items);
+        set({ totalAmount, badgeCount });
+      },
 
-  // Thêm món vào giỏ (POST /cart/items)
-  addToCart: async (payload) => {
-    await fetch(`${API_BASE}/cart/items`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    await get().fetchCart(); // Cập nhật lại giỏ và nhảy Badge ngay lập tức
-  },
+      // 1. Thêm món vào giỏ hàng
+      addToCart: (payload) => {
+        const currentItems = get().items;
+        const toppings = payload.toppings || [];
 
-  // Cập nhật số lượng (PATCH /cart/items/:id)
-  updateQty: async (cartItemId: number, qty: number) => {
-    await fetch(`${API_BASE}/cart/items/${cartItemId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ qty }),
-    });
-    await get().fetchCart();
-  },
+        // Tìm món trùng productId, size và topping
+        const existingIndex = currentItems.findIndex(
+          (item) =>
+            item.productId === payload.productId &&
+            item.size === payload.size &&
+            JSON.stringify(item.toppings?.map((t) => t.id).sort()) ===
+              JSON.stringify(toppings.map((t) => t.id).sort()),
+        );
 
-  // Xóa món khỏi giỏ (DELETE /cart/items/:id)
-  removeItem: async (cartItemId: number) => {
-    await fetch(`${API_BASE}/cart/items/${cartItemId}`, {
-      method: 'DELETE',
-    });
-    await get().fetchCart();
-  },
-}));
+        let unitPrice = payload.unitPrice;
+        let name = payload.name;
+
+        if (!unitPrice || !name) {
+          const product = COFFEE_PRODUCTS.find((p) => p.id === payload.productId);
+          name = name || product?.name || `Sản phẩm #${payload.productId}`;
+          const basePrice = product?.price || 35000;
+          const sizePrice = SIZE_PRICES[payload.size] || 0;
+          const toppingsPrice = toppings.reduce((sum, t) => sum + t.price, 0);
+          unitPrice = unitPrice || basePrice + sizePrice + toppingsPrice;
+        }
+
+        let updatedItems: CartItem[];
+
+        if (existingIndex > -1) {
+          updatedItems = currentItems.map((item, index) => {
+            if (index === existingIndex) {
+              const newQty = item.qty + payload.qty;
+              return {
+                ...item,
+                qty: newQty,
+                lineTotal: item.unitPrice * newQty,
+              };
+            }
+            return item;
+          });
+        } else {
+          const newItem: CartItem = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            productId: payload.productId,
+            name,
+            size: payload.size,
+            toppings,
+            unitPrice,
+            qty: payload.qty,
+            lineTotal: unitPrice * payload.qty,
+          };
+          updatedItems = [...currentItems, newItem];
+        }
+
+        const { totalAmount, badgeCount } = computeTotals(updatedItems);
+        set({ items: updatedItems, totalAmount, badgeCount });
+      },
+
+      // 2. Sửa số lượng món trong giỏ
+      updateQty: (cartItemId, qty) => {
+        if (qty <= 0) {
+          get().removeItem(cartItemId);
+          return;
+        }
+
+        const updatedItems = get().items.map((item) =>
+          item.id === cartItemId
+            ? {
+                ...item,
+                qty,
+                lineTotal: item.unitPrice * qty,
+              }
+            : item,
+        );
+
+        const { totalAmount, badgeCount } = computeTotals(updatedItems);
+        set({ items: updatedItems, totalAmount, badgeCount });
+      },
+
+      // 3. Xóa món khỏi giỏ hàng
+      removeItem: (cartItemId) => {
+        const updatedItems = get().items.filter((item) => item.id !== cartItemId);
+        const { totalAmount, badgeCount } = computeTotals(updatedItems);
+        set({ items: updatedItems, totalAmount, badgeCount });
+      },
+
+      // 4. Xóa toàn bộ giỏ hàng
+      clearCart: () => {
+        set({ items: [], totalAmount: 0, badgeCount: 0 });
+      },
+    }),
+    {
+      name: 'brewlite-cart-storage',
+    },
+  ),
+);

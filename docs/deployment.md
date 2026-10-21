@@ -86,3 +86,4 @@ Hệ thống cung cấp sẵn file `docker-compose.yml` để khởi chạy đ�
 - Nền tảng khuyến nghị: **Vercel** (tối ưu hóa hoàn hảo cho Next.js).
 - Root Directory trong thiết lập Vercel: `apps/web`.
 - Biến môi trường: `NEXT_PUBLIC_API_URL=https://api.yourdomain.com`
+

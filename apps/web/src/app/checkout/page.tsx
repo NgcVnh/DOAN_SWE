@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 type PaymentMethodType = 'WALLET' | 'CARD';
 
@@ -40,18 +41,17 @@ export default function CheckoutPage() {
           orderId: orderId,
           method: method,
           idempotencyKey: idempotencyKey,
-          mockSuccess: mockSuccess
+          mockSuccess: mockSuccess,
         }),
       });
 
       const data = await response.json();
-      if(!response.ok) {
+      if (!response.ok) {
         throw new Error(data.message || 'Thanh toán thất bại');
       }
 
-      if(data.orderStatus === 'PAID') {
-        // [Thành công]: Xóa giỏ hàng & chuyển sang màn hình Xác nhận (#5)
-        // (Sau này ghép với Cart Store: clearCart())
+      if (data.orderStatus === 'PAID') {
+        // [Thành công]: Chuyển sang màn hình Xác nhận
         setOrderPaidResult({
           orderId: data.orderId,
           status: 'PAID',
@@ -61,7 +61,6 @@ export default function CheckoutPage() {
           data.errorMessage || 'Giao dịch thanh toán bị từ chối. Giỏ hàng của bạn vẫn được giữ nguyên',
         );
       }
-
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Có lỗi kết nối tới máy chủ thanh toán';
       setErrorMessage(msg);
@@ -70,7 +69,7 @@ export default function CheckoutPage() {
     }
   };
 
-  // Màn hình (5) Xác nhận đơn hàng khi thanh toán thành công (PAID)
+  // Màn hình (5) Xác nhận đơn hàng khi thanh toán thành công (PAID) - Task 9
   if (orderPaidResult) {
     return (
       <div className="min-h-screen bg-amber-50/40 flex items-center justify-center p-4">
@@ -91,12 +90,12 @@ export default function CheckoutPage() {
             </p>
           </div>
           <p className="text-slate-600 text-sm mb-6">Mời bạn tới quầy nhận đồ uống nhé!</p>
-          <a
+          <Link
             href="/"
-            className="block w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold transition"
+            className="block w-full py-3 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-semibold transition"
           >
-            Về trang chủ
-          </a>
+            Về thực đơn
+          </Link>
         </div>
       </div>
     );
@@ -111,7 +110,7 @@ export default function CheckoutPage() {
         <div className="py-6 text-center border-b border-dashed">
           <p className="text-sm text-slate-500">Tổng tiền đơn hàng #{orderId}</p>
           <p className="text-3xl font-extrabold text-emerald-700 mt-1">
-            {totalAmount.toLocaleString('vi-VN')}đ
+            {totalAmount.toLocaleString('vi-VN')} đ
           </p>
         </div>
 
@@ -158,7 +157,7 @@ export default function CheckoutPage() {
           </label>
         </div>
 
-        {/* Tuỳ chọn phụ hỗ trợ lúc Demo cho giảng viên */}
+        {/* Tùy chọn phục vụ lúc Demo cho giảng viên */}
         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-4 text-xs text-slate-600 flex items-center justify-between">
           <span>Chế độ giả lập (Demo cho giảng viên):</span>
           <button
@@ -195,4 +194,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-

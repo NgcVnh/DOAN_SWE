@@ -1,4 +1,4 @@
-import { Controller , Get} from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 import { Products } from './Interfaces/product.interface.js';
 
@@ -7,7 +7,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll(): Products[] {
+  async findAll(): Promise<Products[]> {
     return this.productsService.findAll();
   }
 }

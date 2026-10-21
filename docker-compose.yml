@@ -63,3 +63,4 @@ volumes:
 networks:
   brewlite-network:
     driver: bridge
+

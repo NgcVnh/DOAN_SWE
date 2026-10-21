@@ -27,3 +27,4 @@ export const CartBadge: React.FC = () => {
     </Link>
   );
 };
+
