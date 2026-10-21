@@ -1,0 +1,68 @@
+@startuml sequence-checkout
+autonumber
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam roundcorner 10
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
+actor "Khách hàng\n(Next.js Web)" as User #E0F2FE
+participant "Giỏ hàng\n(Cart Store)" as Cart #F1F5F9
+box "NestJS Backend" #F8FAFC
+    participant "PaymentsController" as Controller #E2E8F0
+    participant "PaymentsService" as Service #E2E8F0
+    participant "PaymentStrategy\n(OOP Strategy)" as Strategy #FEF08A
+end box
+database "PostgreSQL\n(Prisma ORM)" as DB #DCFCE7
+
+User -> Controller : POST /payments\n{orderId, method, idempotencyKey}
+activate Controller
+
+Controller -> Service : processPayment(dto)
+activate Service
+
+Service -> DB : 1. Kiểm tra IdempotencyKey (bảng payments)
+activate DB
+DB --> Service : Kết quả kiểm tra
+deactivate DB
+
+Service -> DB : 2. Tìm Order & kiểm tra trạng thái hợp lệ\n(PENDING hoặc PAYMENT_FAILED)
+activate DB
+DB --> Service : Thông tin Order
+deactivate DB
+
+Service -> Strategy : 3. Đa hình (Polymorphism): charge(amount, mockSuccess)
+activate Strategy
+
+alt Thanh toán THÀNH CÔNG (MockSuccess = true)
+    Strategy --> Service : { success: true, transactionRef: "WALLET_xxx" }
+    
+    Service -> DB : 4. Transaction:\n- Tạo Payment (status: SUCCESS)\n- Đổi Order status -> PAID\n- Cộng Loyalty Points vào User
+    activate DB
+    DB --> Service : Transaction Committed (ACID)
+    deactivate DB
+    
+    Service --> Controller : { success: true, orderStatus: "PAID" }
+    Controller --> User : HTTP 200 OK { orderStatus: "PAID" }
+    
+    User -> Cart : Xóa giỏ hàng (clearCart) & Chuyển sang màn hình Xác nhận (#5)
+
+else Thanh toán THẤT BẠI (MockSuccess = false)
+    Strategy --> Service : { success: false, errorMessage: "Thẻ/Ví bị từ chối" }
+    deactivate Strategy
+    
+    Service -> DB : 4. Transaction:\n- Tạo Payment (status: FAILED)\n- Đổi Order status -> PAYMENT_FAILED
+    activate DB
+    DB --> Service : Transaction Committed
+    deactivate DB
+    
+    Service --> Controller : { success: false, orderStatus: "PAYMENT_FAILED" }
+    deactivate Service
+    
+    Controller --> User : HTTP 200/400 { orderStatus: "PAYMENT_FAILED", errorMessage }
+    deactivate Controller
+    
+    User -> Cart : GIỮ NGUYÊN giỏ hàng & Hiển thị thông báo đỏ "Thử lại"
+end
+
+@enduml

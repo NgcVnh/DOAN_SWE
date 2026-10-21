@@ -54,12 +54,15 @@ Hệ thống cung cấp sẵn file `docker-compose.yml` để khởi chạy đ�
    npm --prefix apps/web install
    ```
 
-2. **Khởi chạy ứng dụng:**
+2. **Đồng bộ và khởi tạo dữ liệu Database:**
    ```bash
-   # Chạy đồng thời cả Frontend và Backend từ thư mục gốc
-   npm run dev:all
+   npm run db:push
+   npm run db:seed
+   ```
 
-   # Hoặc chạy riêng biệt:
+3. **Khởi chạy ứng dụng:**
+   ```bash
+   # Chạy riêng biệt từng service:
    npm run dev:api    # Chạy Backend tại port 3001
    npm run dev:web    # Chạy Frontend tại port 3000
    ```
