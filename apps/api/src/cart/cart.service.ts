@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import {
   CART_REPOSITORY,
-  ICartRepository,
+  type ICartRepository,
 } from './domain/cart.repository.interface.js';
 import { Cart } from './domain/cart.entity.js';
 import { CartItem } from './domain/cart-item.entity.js';
