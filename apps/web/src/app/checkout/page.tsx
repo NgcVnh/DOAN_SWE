@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { getAuthToken } from '@/lib/auth';
 
 type PaymentMethodType = 'WALLET' | 'CARD';
 
@@ -35,6 +37,7 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
         },
         body: JSON.stringify({
           orderId: orderId,
@@ -106,7 +109,13 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-amber-50/40 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-        <h1 className="text-xl font-bold text-center text-slate-800 border-b pb-4">Thanh toán</h1>
+        <div className="flex items-center justify-between border-b pb-4">
+          <Link href="/" className="text-xs text-slate-500 hover:text-emerald-700 font-medium">
+            ← Về trang chủ
+          </Link>
+          <h1 className="text-xl font-bold text-slate-800">Thanh toán</h1>
+          <div className="w-16"></div>
+        </div>
 
         <div className="py-6 text-center border-b border-dashed">
           <p className="text-sm text-slate-500">Tổng tiền đơn hàng #{orderId}</p>
