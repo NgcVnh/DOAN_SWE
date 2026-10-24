@@ -6,7 +6,7 @@ import { ProductsModule } from './products/products.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { AuthModule } from './auth/auth.module.js';
-import { CartModule } from './cart/cart.module.js';
+import { OrdersModule } from './orders/orders.module.js';
 
 export const {
   ObserveModule,
@@ -24,7 +24,7 @@ export const {
     ProductsModule,
     PaymentsModule,
     AuthModule,
-    CartModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Ma trận truy vết (Traceability Matrix)
 
 | Mã yêu cầu | Use-case / User Story | Thiết kế / Sơ đồ | Code / API | Test |
@@ -11,6 +12,8 @@
 | FR-06 | US-06 Lịch sử đơn hàng | Activity-01 | `GET /orders/me` | API-T04 |
 
 =======
+=======
+>>>>>>> origin/Nhanbranch
 # Ma trận truy vết yêu cầu (Traceability Matrix) — BrewLite
 
 Ma trận truy vết kết nối giữa **Yêu cầu chức năng (FR)**, **Mô hình thiết kế**, **API Backend**, **Giao diện Frontend**, và **Kiểm thử (Test Cases)**.
@@ -27,4 +30,8 @@ Ma trận truy vết kết nối giữa **Yêu cầu chức năng (FR)**, **Mô 
 | **FR4** | Đặt hàng & Thanh toán | `Order`, `OrderItem` | `POST /orders` | `apps/web/src/app/checkout/page.tsx` | TC-ORD-01: Tạo đơn hàng mới thành công |
 | **FR5** | Theo dõi trạng thái đơn | `Order.status` | `GET /orders/:id` | `apps/web/src/app/orders/[id]/page.tsx` | TC-ORD-02: Tra cứu đúng tiến độ đơn hàng |
 | **FR6** | Trải nghiệm PWA Mobile | `PWA Manifest / SW` | N/A | `apps/web/public/manifest.json` | TC-PWA-01: Khả năng cài đặt Add-to-Home-Screen |
+<<<<<<< HEAD
+>>>>>>> origin/Nhanbranch
+=======
+
 >>>>>>> origin/Nhanbranch

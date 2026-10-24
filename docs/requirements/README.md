@@ -67,3 +67,4 @@
 | **NFR3: Reliability** | Độ tin cậy | Giữ trạng thái giỏ hàng liên tục (Persistent State / LocalStorage + Backend Sync). |
 | **NFR4: Usability** | Trải nghiệm người dùng | Thao tác ngón tay cái thuận tiện (Bottom Navigation, Sticky Checkout button). |
 | **NFR5: Maintainability** | Khả năng bảo trì | Tuân thủ TypeScript nghiêm ngặt, tách biệt ranh giới domain logic và infrastructure. |
+

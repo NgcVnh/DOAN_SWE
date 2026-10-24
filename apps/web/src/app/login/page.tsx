@@ -3,12 +3,14 @@
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Coffee, AlertCircle } from 'lucide-react';
 import { saveAuthData } from '@/lib/auth';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
+  const noticeMsg = searchParams.get('notice');
 
   // State các trường thông tin trong form
   const [email, setEmail] = useState('');
@@ -84,7 +86,7 @@ function LoginForm() {
         saveAuthData(data.accessToken, data.user);
       }
 
-      // Điều hướng về trang đích
+      // Điều hướng về trang đích (trang sản phẩm hoặc trang trước đó)
       router.push(redirectUrl);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Có lỗi kết nối tới máy chủ';
@@ -95,19 +97,39 @@ function LoginForm() {
   };
 
   return (
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8">
+    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-stone-200/90 p-8">
+      {/* Nút quay lại trang hiển thị sản phẩm */}
+      <div className="mb-5">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 px-3 py-1.5 rounded-xl transition shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay lại trang hiển thị sản phẩm</span>
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="text-center mb-6">
-        <Link href="/" className="inline-block">
-          <span className="text-2xl font-black tracking-tight text-emerald-800">
-            ☕ BrewLite
-          </span>
+        <Link href="/" className="inline-flex items-center gap-2 text-2xl font-black tracking-tight text-amber-900">
+          <div className="bg-amber-600 text-white p-2 rounded-xl shadow-xs">
+            <Coffee className="w-5 h-5" />
+          </div>
+          <span>Brew<span className="text-amber-600">Lite</span></span>
         </Link>
-        <h1 className="text-xl font-bold text-slate-800 mt-2">Đăng nhập tài khoản</h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Nhập email và mật khẩu của bạn để tiếp tục
+        <h1 className="text-xl font-bold text-stone-900 mt-3">Đăng nhập tài khoản</h1>
+        <p className="text-xs text-stone-500 mt-1">
+          Đăng nhập để thêm sản phẩm vào giỏ và tiến hành thanh toán
         </p>
       </div>
+
+      {/* Thông báo nhắc nhở cần đăng nhập (nếu chuyển hướng từ hành động giỏ/thanh toán) */}
+      {noticeMsg && (
+        <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+          <p className="font-medium">{noticeMsg}</p>
+        </div>
+      )}
 
       {/* Thông báo lỗi tổng quát */}
       {generalError && (
@@ -120,7 +142,7 @@ function LoginForm() {
       <form onSubmit={handleLogin} className="space-y-4" noValidate>
         {/* Email */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <label className="block text-xs font-semibold text-stone-700 mb-1">
             Địa chỉ Email <span className="text-rose-500">*</span>
           </label>
           <input
@@ -129,10 +151,10 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="user@example.com"
             autoComplete="email"
-            className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-slate-800 focus:outline-none transition ${
+            className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-stone-800 focus:outline-none transition ${
               fieldErrors.email
                 ? 'border-rose-400 bg-rose-50/30 focus:border-rose-500'
-                : 'border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600'
+                : 'border-stone-300 focus:border-amber-600 focus:ring-1 focus:ring-amber-600'
             }`}
           />
           {fieldErrors.email && (
@@ -143,7 +165,7 @@ function LoginForm() {
         {/* Mật khẩu */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-700">
+            <label className="block text-xs font-semibold text-stone-700">
               Mật khẩu <span className="text-rose-500">*</span>
             </label>
           </div>
@@ -154,16 +176,16 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Nhập mật khẩu"
               autoComplete="current-password"
-              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-slate-800 focus:outline-none transition pr-16 ${
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-stone-800 focus:outline-none transition pr-16 ${
                 fieldErrors.password
                   ? 'border-rose-400 bg-rose-50/30 focus:border-rose-500'
-                  : 'border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600'
+                  : 'border-stone-300 focus:border-amber-600 focus:ring-1 focus:ring-amber-600'
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2.5 text-xs text-slate-500 hover:text-slate-800"
+              className="absolute right-3 top-2.5 text-xs text-stone-500 hover:text-stone-800"
             >
               {showPassword ? 'Ẩn' : 'Hiện'}
             </button>
@@ -176,16 +198,19 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full mt-2 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-sm transition shadow-md"
+          className="w-full mt-2 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-sm transition shadow-md"
         >
           {loading ? 'Đang xác thực...' : 'Đăng nhập'}
         </button>
       </form>
 
       {/* Footer chuyển sang Đăng ký */}
-      <div className="mt-6 text-center text-xs text-slate-500 border-t border-slate-100 pt-4">
+      <div className="mt-6 text-center text-xs text-stone-500 border-t border-stone-100 pt-4">
         <span>Chưa có tài khoản? </span>
-        <Link href="/register" className="font-semibold text-emerald-700 hover:underline">
+        <Link
+          href={`/register${redirectUrl !== '/' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
+          className="font-semibold text-amber-700 hover:underline"
+        >
           Đăng ký ngay
         </Link>
       </div>
@@ -195,8 +220,8 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/70 via-stone-50 to-emerald-50/40 flex items-center justify-center p-4">
-      <Suspense fallback={<div className="text-center text-sm text-slate-500">Đang tải...</div>}>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/70 via-stone-50 to-amber-100/40 flex items-center justify-center p-4">
+      <Suspense fallback={<div className="text-center text-sm text-stone-500">Đang tải...</div>}>
         <LoginForm />
       </Suspense>
     </div>

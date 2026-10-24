@@ -1,15 +1,17 @@
 'use client';
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Coffee } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Coffee, AlertCircle } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
+import { getStoredUser } from '@/lib/auth';
 
 export default function CartPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const { items, totalAmount, isLoading, fetchCart, updateQty, removeItem } = useCartStore();
 
   useEffect(() => {
     fetchCart();
+    setIsLoggedIn(!!getStoredUser());
   }, [fetchCart]);
 
   return (
@@ -24,6 +26,27 @@ export default function CartPage() {
       </div>
 
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
+        {/* Nhắc nhở nếu chưa đăng nhập */}
+        {!isLoggedIn && items.length > 0 && (
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-xs text-amber-900">
+            <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Bạn chưa đăng nhập</p>
+              <p className="mt-0.5 text-amber-800">
+                Vui lòng đăng nhập để tiến hành đặt hàng và thanh toán.
+              </p>
+            </div>
+            <Link
+              href={`/login?redirect=${encodeURIComponent('/checkout')}&notice=${encodeURIComponent(
+                'Vui lòng đăng ký hoặc đăng nhập tài khoản trước khi tiến hành thanh toán!',
+              )}`}
+              className="px-3 py-1.5 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition"
+            >
+              Đăng nhập
+            </Link>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="py-20 text-center text-stone-500">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-amber-600 border-t-transparent" />
@@ -47,7 +70,7 @@ export default function CartPage() {
           </div>
         ) : (
           <>
-            {/* List Cart Items */}
+            {/* List Cart Items (Task 5: Thêm / Sửa số lượng / Xóa) */}
             <div className="space-y-3">
               {items.map((item) => (
                 <div
@@ -82,6 +105,7 @@ export default function CartPage() {
                         {(item.lineTotal || item.unitPrice * item.qty).toLocaleString('vi-VN')} đ
                       </span>
 
+                      {/* Nút tăng/giảm số lượng */}
                       <div className="flex items-center border border-stone-200 rounded-lg overflow-hidden bg-stone-50">
                         <button
                           onClick={() => {
@@ -92,6 +116,7 @@ export default function CartPage() {
                             }
                           }}
                           className="p-1 px-2 text-stone-600 hover:bg-stone-200 transition"
+                          title="Giảm số lượng"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -99,6 +124,7 @@ export default function CartPage() {
                         <button
                           onClick={() => updateQty(item.id, item.qty + 1)}
                           className="p-1 px-2 text-stone-600 hover:bg-stone-200 transition"
+                          title="Tăng số lượng"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -109,7 +135,7 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Price Summary */}
+            {/* Price Summary: Tự tính tổng tiền (Task 5) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-2.5 text-sm">
               <h3 className="font-semibold text-stone-900 pb-1 border-b border-stone-100">Chi tiết thanh toán</h3>
               <div className="flex justify-between text-stone-600">
@@ -117,7 +143,7 @@ export default function CartPage() {
                 <span>{totalAmount.toLocaleString('vi-VN')} đ</span>
               </div>
               <div className="flex justify-between text-stone-600">
-                <span>Phí giao hàng</span>
+                <span>Phí dịch vụ</span>
                 <span className="text-emerald-600 font-medium">Miễn phí</span>
               </div>
               <div className="flex justify-between font-bold text-base text-stone-900 pt-2 border-t border-stone-100">
@@ -129,7 +155,7 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* Sticky Bottom Checkout Bar (Mobile-First) */}
+      {/* Sticky Bottom Bar chuyển sang thanh toán */}
       {items.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-stone-200 p-4 shadow-lg z-50">
           <div className="max-w-md mx-auto flex items-center justify-between gap-4">
@@ -139,12 +165,23 @@ export default function CartPage() {
                 {totalAmount.toLocaleString('vi-VN')} đ
               </p>
             </div>
-            <button
-              onClick={() => alert('Chức năng đặt hàng đang được xử lý tiếp!')}
-              className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition active:scale-95 text-center"
-            >
-              Tiến hành Đặt hàng
-            </button>
+            {isLoggedIn ? (
+              <Link
+                href="/checkout"
+                className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition active:scale-95 text-center"
+              >
+                Tiến hành Thanh toán
+              </Link>
+            ) : (
+              <Link
+                href={`/login?redirect=${encodeURIComponent('/checkout')}&notice=${encodeURIComponent(
+                  'Vui lòng đăng ký hoặc đăng nhập tài khoản trước khi tiến hành thanh toán!',
+                )}`}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition active:scale-95 text-center text-sm"
+              >
+                Đăng nhập để thanh toán
+              </Link>
+            )}
           </div>
         </div>
       )}
