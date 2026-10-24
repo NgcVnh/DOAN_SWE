@@ -1,0 +1,176 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  READY
+  COMPLETED
+  PAYMENT_FAILED
+  CANCELLED
+}
+
+enum ProductSize {
+  S
+  M
+  L
+}
+
+enum PaymentMethod {
+  WALLET
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  fullName      String?
+  passwordHash  String
+  loyaltyPoints Int      @default(0)
+  orders        Order[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Product {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String?
+  price       Int
+  imageUrl    String?
+  stock       Int         @default(0)
+  isAvailable Boolean     @default(true)
+  version     Int         @default(1) // Phục vụ Optimistic Locking (Task 10)
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  createdAt   DateTime    @default(now())
+
+  @@map("products")
+}
+
+model Topping {
+  id          Int     @id @default(autoincrement())
+  name        String
+  price       Int
+  isAvailable Boolean @default(true)
+
+  @@map("toppings")
+}
+
+model Promotion {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Int
+  minOrderValue Int          @default(0)
+  maxDiscount   Int?
+  usageLimit    Int?
+  usedCount     Int          @default(0)
+  isActive      Boolean      @default(true)
+  expiredAt     DateTime
+  orders        Order[]
+
+  @@map("promotions")
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  userId         Int
+  promotionId    Int?
+  status         OrderStatus @default(PENDING)
+  subtotal       Int
+  discountAmount Int         @default(0)
+  total          Int
+  pointsEarned   Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id])
+  promotion Promotion?  @relation(fields: [promotionId], references: [id])
+  items     OrderItem[]
+  payments  Payment[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int         @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  size      ProductSize
+  toppings  Json        @default("[]") // Lưu danh sách topping kèm giá
+  unitPrice Int
+  qty       Int
+  lineTotal Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  orderId        Int
+  idempotencyKey String        @unique
+  amount         Int
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  transactionRef String?
+  createdAt      DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        Int         @id @default(autoincrement())
+  cartId    String
+  productId Int
+  name      String
+  price     Int
+  quantity  Int         @default(1)
+  size      ProductSize @default(M)
+  toppings  Json        @default("[]")
+  image     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("cart_items")
+}
+
+

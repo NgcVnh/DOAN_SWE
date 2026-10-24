@@ -1,0 +1,24 @@
+{
+  "name": "brewlite-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "dev:frontend": "npm run dev:web",
+    "dev:backend": "npm run dev:api",
+    "build:web": "npm --prefix apps/web run build",
+    "build:api": "npm --prefix apps/api run build",
+    "build:frontend": "npm run build:web",
+    "build:backend": "npm run build:api",
+    "build": "npm run build:api",
+    "test": "npm --prefix apps/api run test",
+    "db:push": "npm --prefix apps/api run db:push",
+    "db:seed": "npm --prefix apps/api run db:seed",
+    "prisma:generate": "npm --prefix apps/api run prisma:generate",
+    "prisma:studio": "npm --prefix apps/api npx prisma studio"
+  },
+  "dependencies": {
+    "zustand": "^5.0.3"
+  }
+}
