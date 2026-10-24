@@ -1,0 +1,22 @@
+{
+  "name": "BrewLite — Coffee & Beverages",
+  "short_name": "BrewLite",
+  "description": "Nền tảng đặt đồ uống cà phê trực tuyến hiện đại với trải nghiệm PWA mượt mà.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#78350f",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
