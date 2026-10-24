@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useCartStore } from '@/store/useCartStore';
 
 type PaymentMethodType = 'WALLET' | 'CARD';
 
@@ -20,6 +21,8 @@ export default function CheckoutPage() {
   // Giả sử đơn hàng đang chờ thanh toán (khi ghép với giỏ hàng của nhóm, lấy từ URL hoặc Cart Store)
   const [orderId] = useState<number>(1);
   const [totalAmount] = useState<number>(123000);
+  
+  const { clearCart } = useCartStore();
 
   /**
    * Hàm xử lý khi khách hàng bấm nút "Xác nhận trả"
@@ -56,6 +59,7 @@ export default function CheckoutPage() {
           orderId: data.orderId,
           status: 'PAID',
         });
+        clearCart();
       } else {
         setErrorMessage(
           data.errorMessage || 'Giao dịch thanh toán bị từ chối. Giỏ hàng của bạn vẫn được giữ nguyên',

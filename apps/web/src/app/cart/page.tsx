@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Coffee } from 'lucide-react';

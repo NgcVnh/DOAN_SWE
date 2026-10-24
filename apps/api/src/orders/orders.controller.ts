@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post , Req} from '@nestjs/common';
 import { OrdersService } from './orders.service.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto.js';
@@ -15,6 +15,11 @@ export class OrdersController {
   @Get()
   async getAllOrders() {
     return this.ordersService.findAll();
+  }
+  @Get('me')
+  async getMyOrders(@Req() req: any){
+    const userId = req.user?.id || req.user?.sub || 'user-default-id';
+    return this.ordersService.findByUserId(userId);
   }
 
   // Hỗ trợ xem chi tiết đơn và chuyển trạng thái 

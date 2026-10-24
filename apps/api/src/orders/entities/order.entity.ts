@@ -5,6 +5,7 @@ export class Order {
   id: string;
   orderCode: string;
   items: OrderItem[];
+  userId: string;
   status: OrderStatus;
   totalAmount: number;
   promoCode?: string;

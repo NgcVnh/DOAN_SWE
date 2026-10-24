@@ -191,7 +191,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-stone-200 bg-white py-6 text-center text-xs text-stone-500">
-        BrewLite Monorepo &copy; 2026 — Đồ án môn Kỹ thuật phần mềm (SWE)
+        BrewLite Monorepo &copy; 2026 — Đồ án môn Công nghệ phần mềm (SWE)
       </footer>
     </div>
   );

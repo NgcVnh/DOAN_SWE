@@ -27,6 +27,7 @@ export class OrdersService {
     const newOrder: Order = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : randomUUID(),
       orderCode,
+      userId,
       items: createOrderDto.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -45,7 +46,11 @@ export class OrdersService {
 
     return newOrder;
   }
-
+  findByUserId(userId: string): Order[] {
+    return this.orders
+      .filter((order) => order.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
   findByCode(orderCode: string): Order {
     const order = this.orders.find(
       (o) => o.orderCode === orderCode || o.id === orderCode,
