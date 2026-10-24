@@ -4,12 +4,16 @@ import { OrderItem } from './order-item.entity.js';
 export class Order {
   id: string;
   orderCode: string;
+  userId?: number;
   items: OrderItem[];
   status: OrderStatus;
+  subtotal: number;
+  discountAmount: number;
+  pointsDiscount: number;
+  pointsToUse?: number;
+  pointsEarned: number;
   totalAmount: number;
   promoCode?: string;
-  pointsToUse?: number;
   createdAt: Date;
   updatedAt: Date;
 }
-
