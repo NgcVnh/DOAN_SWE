@@ -1,118 +1,197 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Header } from '../components/Header';
+import { Coffee, ArrowRight, RefreshCw, AlertCircle, ShoppingBag } from 'lucide-react';
+
+export interface Product {
+  id: number;
+  name: string;
+  price: number;
+  image: string;
+  description?: string;
+}
 
 export default function Home() {
-  const [backendStatus, setBackendStatus] = useState<string>('Đang kiểm tra kết nối tới Backend...');
-  const [backendHealthy, setBackendHealthy] = useState<boolean | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+  // Task 3: Next.js gọi trực tiếp endpoint /products của Backend Task 2
+  const fetchProducts = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`Máy chủ phản hồi mã lỗi HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Không thể kết nối đến máy chủ Backend (Port 3001)';
+      setError(`Lỗi gọi API: ${message}. Vui lòng kiểm tra backend (npm run dev:api).`);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch(apiUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.text();
-      })
-      .then((data) => {
-        setBackendStatus(`Kết nối thành công! Phản hồi từ backend: "${data}"`);
-        setBackendHealthy(true);
-      })
-      .catch((err) => {
-        setBackendStatus(`Chưa kết nối được với Backend (${apiUrl}). Hãy đảm bảo Backend đang chạy (npm run dev:backend).`);
-        setBackendHealthy(false);
-      });
-  }, [apiUrl]);
+    fetchProducts();
+  }, []);
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(price);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col justify-between p-8 sm:p-16">
-      <header className="max-w-4xl mx-auto w-full flex items-center justify-between border-b border-slate-700/60 pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
-            DOAN_SWE
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">Full-Stack Monorepo: Next.js + NestJS</p>
-        </div>
-        <span className="text-xs px-3 py-1 rounded-full bg-blue-900/60 text-blue-300 border border-blue-700/50">
-          v1.0.0
-        </span>
-      </header>
+    <div className="min-h-screen bg-stone-50 text-stone-800 flex flex-col">
+      <Header />
 
-      <main className="max-w-4xl mx-auto w-full my-auto py-12 flex flex-col gap-8">
-        {/* Connection status banner */}
-        <div
-          className={`p-5 rounded-xl border flex items-center gap-4 transition-all duration-300 ${
-            backendHealthy === true
-              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-              : backendHealthy === false
-              ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
-              : 'bg-slate-800/60 border-slate-700 text-slate-300'
-          }`}
-        >
-          <div
-            className={`w-3.5 h-3.5 rounded-full animate-pulse ${
-              backendHealthy === true
-                ? 'bg-emerald-400'
-                : backendHealthy === false
-                ? 'bg-amber-400'
-                : 'bg-blue-400'
-            }`}
-          />
-          <div className="flex-1">
-            <p className="font-semibold text-sm">Trạng thái kết nối Backend</p>
-            <p className="text-xs mt-0.5 opacity-90">{backendStatus}</p>
-          </div>
-        </div>
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">🌐</span>
-              <h2 className="text-lg font-bold text-slate-100">Frontend (Next.js)</h2>
-            </div>
-            <p className="text-slate-300 text-sm mb-4">
-              Xây dựng với Next.js App Router, React 19, TypeScript và Tailwind CSS.
+      <main className="max-w-md mx-auto md:max-w-4xl lg:max-w-6xl px-4 py-8 flex-1 w-full">
+        {/* Tiêu đề & Nút tải lại */}
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-amber-950 flex items-center gap-2">
+              <Coffee className="w-7 h-7 text-amber-600" />
+              <span>Thực đơn sản phẩm</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-stone-500 mt-1">
+              Dữ liệu lấy từ API NestJS: GET /products
             </p>
-            <div className="text-xs space-y-1.5 text-slate-400">
-              <p>📍 URL: <code className="bg-slate-900 px-2 py-0.5 rounded text-blue-300">http://localhost:3000</code></p>
-              <p>⚡ Lệnh chạy: <code className="bg-slate-900 px-2 py-0.5 rounded text-indigo-300">npm run dev:frontend</code></p>
-            </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">⚙️</span>
-              <h2 className="text-lg font-bold text-slate-100">Backend (NestJS)</h2>
+          <button
+            onClick={fetchProducts}
+            disabled={loading}
+            title="Tải lại thực đơn"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:text-amber-700 hover:bg-stone-50 transition shadow-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-600' : ''}`} />
+            <span>Tải lại</span>
+          </button>
+        </div>
+
+        {/* Thông báo lỗi khi không gọi được Backend */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-xs sm:text-sm text-red-800">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Lỗi tải danh sách món</p>
+              <p className="mt-0.5 text-xs text-red-700">{error}</p>
             </div>
-            <p className="text-slate-300 text-sm mb-4">
-              Xây dựng với NestJS v12, kiến trúc module, RESTful API và TypeScript.
+            <button
+              onClick={fetchProducts}
+              className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* 1. Trạng thái Loading (Loading state) */}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 py-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 border border-stone-200 animate-pulse space-y-3">
+                <div className="h-48 bg-stone-200 rounded-xl" />
+                <div className="h-4 bg-stone-200 rounded w-3/4" />
+                <div className="h-4 bg-stone-200 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 2. Trạng thái Trống (Empty state) */}
+        {!loading && !error && products.length === 0 && (
+          <div className="mx-auto max-w-md rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center shadow-sm my-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-3">
+              <ShoppingBag className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-stone-800">Chưa có sản phẩm nào</h3>
+            <p className="mt-1 text-xs text-stone-500">
+              Hiện tại danh mục sản phẩm từ backend đang trống. Hãy chạy lệnh seed dữ liệu:
+              <br />
+              <code className="mt-2 inline-block px-2 py-1 bg-stone-100 rounded text-amber-800 font-mono text-[11px]">
+                npm run db:seed
+              </code>
             </p>
-            <div className="text-xs space-y-1.5 text-slate-400">
-              <p>📍 API: <code className="bg-slate-900 px-2 py-0.5 rounded text-blue-300">http://localhost:3001</code></p>
-              <p>⚡ Lệnh chạy: <code className="bg-slate-900 px-2 py-0.5 rounded text-indigo-300">npm run dev:backend</code></p>
-            </div>
+            <button
+              onClick={fetchProducts}
+              className="mt-5 px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 transition"
+            >
+              Làm mới danh sách
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Quick Instructions */}
-        <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/40">
-          <h3 className="font-semibold text-sm text-slate-200 mb-3">🚀 Hướng dẫn khởi động nhanh</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-500 block mb-1"># Terminal 1: Backend</span>
-              <span className="text-emerald-400">npm run dev:backend</span>
-            </div>
-            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-500 block mb-1"># Terminal 2: Frontend</span>
-              <span className="text-emerald-400">npm run dev:frontend</span>
-            </div>
+        {/* 3. Lưới sản phẩm (Product Grid) */}
+        {!loading && !error && products.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <article
+                key={product.id}
+                className="group flex flex-col bg-white rounded-2xl border border-stone-200/90 shadow-sm hover:shadow-md hover:border-amber-300 transition overflow-hidden"
+              >
+                <div className="relative h-48 w-full overflow-hidden bg-stone-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                    loading="lazy"
+                  />
+                  <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                    #{product.id}
+                  </span>
+                </div>
+
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-stone-900 text-base group-hover:text-amber-700 transition line-clamp-1">
+                      {product.name}
+                    </h3>
+                    <p className="text-xs text-stone-500 mt-1 line-clamp-2">
+                      {product.description || 'Thức uống được pha chế tỉ mỉ từ nguyên liệu tươi nguyên chất.'}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-medium text-stone-400 block">Giá</span>
+                      <span className="text-base font-bold text-amber-700">
+                        {formatPrice(product.price)}
+                      </span>
+                    </div>
+
+                    <Link
+                      href={`/products/${product.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition"
+                    >
+                      <span>Tùy chọn</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+        )}
       </main>
 
-      <footer className="max-w-4xl mx-auto w-full text-center border-t border-slate-800/80 pt-6 text-xs text-slate-500">
-        DOAN_SWE — Đồ án Kỹ thuật Phần mềm
+      <footer className="border-t border-stone-200 bg-white py-6 text-center text-xs text-stone-500">
+        BrewLite Monorepo &copy; 2026 — Đồ án môn Công nghệ phần mềm (SWE)
       </footer>
     </div>
   );

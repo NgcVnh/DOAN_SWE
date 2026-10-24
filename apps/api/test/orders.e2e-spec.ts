@@ -1,0 +1,110 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types.js';
+import { AppModule } from './../src/app.module.js';
+
+describe('OrdersController (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  let createdOrderCode: string;
+
+  it('POST /orders - should create an order with status PENDING', async () => {
+    const payload = {
+      items: [
+        {
+          productId: 'prod-tra-sua-olong',
+          quantity: 2,
+          size: 'M',
+          toppings: ['Trân châu đen', 'Thạch phô mai'],
+        },
+      ],
+      promoCode: 'GIAM10K',
+    };
+
+    const res = await request(app.getHttpServer())
+      .post('/orders')
+      .send(payload)
+      .expect(201);
+
+    expect(res.body).toBeDefined();
+    expect(res.body.orderCode).toBeDefined();
+    expect(res.body.status).toBe('PENDING');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.totalAmount).toBeGreaterThan(0);
+
+    createdOrderCode = res.body.orderCode;
+  });
+
+  it('POST /orders - should fail validation with 400 when items are empty', async () => {
+    const payload = {
+      items: [],
+    };
+
+    const res = await request(app.getHttpServer())
+      .post('/orders')
+      .send(payload)
+      .expect(400);
+
+    expect(res.body.message).toContain('Giỏ hàng không được để trống');
+  });
+
+  it('POST /orders - should fail validation with 400 when size is invalid', async () => {
+    const payload = {
+      items: [
+        {
+          productId: 'prod-cafe',
+          quantity: 1,
+          size: 'XL', // Không hợp lệ
+        },
+      ],
+    };
+
+    const res = await request(app.getHttpServer())
+      .post('/orders')
+      .send(payload)
+      .expect(400);
+
+    expect(res.body.message).toBeDefined();
+  });
+
+  it('GET /orders/:orderCode - should return the created order', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/orders/${createdOrderCode}`)
+      .expect(200);
+
+    expect(res.body.orderCode).toBe(createdOrderCode);
+    expect(res.body.status).toBe('PENDING');
+  });
+
+  it('PATCH /orders/:orderCode/status - should update status to PAID', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/orders/${createdOrderCode}/status`)
+      .send({ status: 'PAID' })
+      .expect(200);
+
+    expect(res.body.orderCode).toBe(createdOrderCode);
+    expect(res.body.status).toBe('PAID');
+  });
+});
+

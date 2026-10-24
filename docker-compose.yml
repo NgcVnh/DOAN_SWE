@@ -1,44 +1,66 @@
-version: '3.9'
-
 services:
-  db:
+  # Database Service (PostgreSQL)
+  postgres:
     image: postgres:16-alpine
-    container_name: brewlite_db
-    restart: unless-stopped
+    container_name: brewlite-postgres
+    restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123
-      POSTGRES_DB: brewlite_db
+      POSTGRES_USER: ${POSTGRES_USER:-brewlite_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-brewlite_password}
+      POSTGRES_DB: ${POSTGRES_DB:-brewlite_db}
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - brewlite_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-brewlite_user} -d ${POSTGRES_DB:-brewlite_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - brewlite-network
 
+  # Backend Service (NestJS API)
   api:
     build:
       context: ./apps/api
-    container_name: brewlite_api
-    restart: unless-stopped
-    depends_on:
-      - db
+      dockerfile: Dockerfile
+    container_name: brewlite-api
+    restart: always
     environment:
       PORT: 3001
-      DATABASE_URL: postgresql://postgres:123@db:5432/brewlite_db?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-brewlite_user}:${POSTGRES_PASSWORD:-brewlite_password}@postgres:5432/${POSTGRES_DB:-brewlite_db}?schema=public
     ports:
-      - '3001:3001'
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - brewlite-network
 
+  # Frontend Service (Next.js PWA)
   web:
     build:
       context: ./apps/web
-    container_name: brewlite_web
-    restart: unless-stopped
-    depends_on:
-      - api
+      dockerfile: Dockerfile
+    container_name: brewlite-web
+    restart: always
     environment:
+      NODE_ENV: production
+      PORT: 3000
       NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
-      - '3000:3000'
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - brewlite-network
 
 volumes:
-  pgdata:
+  brewlite_pgdata:
+    driver: local
+
+networks:
+  brewlite-network:
+    driver: bridge
 
