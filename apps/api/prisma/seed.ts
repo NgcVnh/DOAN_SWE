@@ -1,4 +1,9 @@
-import { PrismaClient, DiscountType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+enum DiscountType {
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED = 'FIXED',
+}
 
 const prisma = new PrismaClient();
 
