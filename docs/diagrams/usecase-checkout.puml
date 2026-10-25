@@ -1,0 +1,56 @@
+@startuml usecase-checkout
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam roundcorner 12
+skinparam shadowing false
+
+skinparam usecase {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  ArrowColor #334155
+  FontName "Segoe UI"
+}
+
+actor "Khách hàng\n(Customer)" as Customer #E0F2FE
+actor "Cổng thanh toán\n(Mock Payment Gateway)" as Gateway #FEF08A
+
+rectangle "Hệ thống Đặt Cà Phê Không Tiền Mặt — BrewLite (Phạm vi Đặt & Thanh toán)" {
+  ' 2 Use-Case chính mà Khách hàng trực tiếp tương tác
+  usecase "UC-01: Đặt đơn hàng\n(POST /orders)" as UC_PlaceOrder #DCFCE7
+  usecase "UC-02: Thanh toán đơn hàng\n(POST /payments)" as UC_PayOrder #FEF9C3
+
+  ' Các Use-Case con của Đặt đơn hàng (mỗi ô 1 chức năng đơn lẻ)
+  usecase "UC-03: Xác thực tài khoản\n(JWT Guard)" as UC_Auth
+  usecase "UC-04: Kiểm tra tồn kho\n(Optimistic Locking)" as UC_CheckStock
+  usecase "UC-05: Áp dụng mã khuyến mãi\n(Promotion)" as UC_Promo
+
+  ' Các Use-Case con của Thanh toán (Đa hình Strategy Pattern)
+  usecase "UC-02a: Thanh toán bằng\nVí điện tử (WALLET)" as UC_Wallet
+  usecase "UC-02b: Thanh toán bằng\nThẻ ngân hàng (CARD)" as UC_Card
+  usecase "UC-06: Cộng điểm tích lũy\n(Loyalty Points)" as UC_Loyalty
+  usecase "UC-07: Thử thanh toán lại\n(khi PAYMENT_FAILED)" as UC_Retry
+}
+
+' Actor chính tương tác với 2 Use-Case gốc
+Customer --> UC_PlaceOrder
+Customer --> UC_PayOrder
+
+' Quan hệ của UC-01: Đặt đơn hàng
+UC_PlaceOrder ..> UC_Auth : <<include>>
+UC_PlaceOrder ..> UC_CheckStock : <<include>>
+UC_Promo ..> UC_PlaceOrder : <<extend>>\n[Có nhập mã giảm giá]
+
+' Quan hệ của UC-02: Thanh toán đơn hàng
+UC_PayOrder ..> UC_Auth : <<include>>
+UC_PayOrder ..> UC_Loyalty : <<include>>
+UC_Retry ..> UC_PayOrder : <<extend>>\n[Khi đơn ở trạng thái\nPAYMENT_FAILED]
+
+' Kế thừa / Đa hình (Generalization - OOP Strategy Pattern)
+UC_PayOrder <|-- UC_Wallet
+UC_PayOrder <|-- UC_Card
+
+' Giao tiếp với Actor phụ (Cổng thanh toán ngoài)
+UC_PayOrder --> Gateway : Xử lý giao dịch\n(Idempotent)
+
+@enduml

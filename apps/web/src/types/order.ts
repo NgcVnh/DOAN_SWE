@@ -324,3 +324,4 @@ export function formatOrderDateTime(isoString: string): string {
 export function formatCurrencyVND(amount: number): string {
   return `${amount.toLocaleString('vi-VN')} đ`;
 }
+

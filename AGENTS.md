@@ -24,3 +24,4 @@ Tuân thủ nghiêm ngặt sơ đồ chuyển trạng thái:
 - Chạy Frontend: `npm run dev:web`
 - Đồng bộ Database: `npm run db:push`
 - Chạy dữ liệu mẫu: `npm run db:seed`
+
