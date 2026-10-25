@@ -53,5 +53,3 @@ export class OrdersController {
     return this.ordersService.transitionOrderStatus(orderCode, updateStatusDto.status);
   }
 }
-
-

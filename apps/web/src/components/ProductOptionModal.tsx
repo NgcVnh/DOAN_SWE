@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { getStoredUser } from '@/lib/auth';
 import { X, Plus, Minus, Check, Coffee, Sparkles } from 'lucide-react';
 import {
   ProductDetailItem,
@@ -29,6 +31,7 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const router = useRouter();
   const { addToCart } = useCartStore();
 
   // State tùy biến
@@ -62,6 +65,18 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
 
   // Xử lý thêm vào giỏ hàng
   const handleAddToCart = async () => {
+    // Bắt buộc phải đăng ký / đăng nhập thì mới được thêm vào giỏ
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      onClose();
+      router.push(
+        `/login?redirect=${encodeURIComponent(`/products/${product.id}`)}&notice=${encodeURIComponent(
+          'Vui lòng đăng ký hoặc đăng nhập tài khoản để thêm món vào giỏ hàng!',
+        )}`,
+      );
+      return;
+    }
+
     await addToCart({
       productId: product.id,
       size,
