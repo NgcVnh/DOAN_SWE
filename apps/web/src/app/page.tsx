@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '../components/Header';
 import { Coffee, ArrowRight, RefreshCw, AlertCircle, ShoppingBag } from 'lucide-react';
+import { clearAuthData, getStoredUser, User } from '@/lib/auth';
 
 export interface Product {
   id: number;
@@ -17,6 +18,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -45,6 +47,13 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Kiểm tra trạng thái đăng nhập từ localStorage
+    const user = getStoredUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+
+    // Lấy danh sách sản phẩm
     fetchProducts();
   }, []);
 
@@ -55,9 +64,51 @@ export default function Home() {
     }).format(price);
   };
 
+  const handleLogout = () => {
+    clearAuthData();
+    setCurrentUser(null);
+  };
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800 flex flex-col">
       <Header />
+
+      {/* Khối tài khoản: đăng nhập / đăng ký / user hiện tại */}
+      <div className="max-w-md mx-auto md:max-w-4xl lg:max-w-6xl w-full px-4 pt-4 flex justify-end">
+        {currentUser ? (
+          <div className="flex items-center gap-3 bg-white border border-stone-200 px-3.5 py-1.5 rounded-xl text-xs shadow-sm">
+            <div>
+              <span className="text-stone-500">Xin chào, </span>
+              <span className="font-bold text-amber-700">{currentUser.fullName || currentUser.email}</span>
+              <span className="ml-2 px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                {currentUser.loyaltyPoints} điểm
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-2.5 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 transition font-medium"
+            >
+              Đăng xuất
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-stone-100 text-stone-700 text-xs font-semibold border border-stone-200 transition shadow-sm"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              href="/register"
+              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition shadow-sm"
+            >
+              Đăng ký
+            </Link>
+          </div>
+        )}
+      </div>
 
       <main className="max-w-md mx-auto md:max-w-4xl lg:max-w-6xl px-4 py-8 flex-1 w-full">
         {/* Tiêu đề & Nút tải lại */}
@@ -68,7 +119,7 @@ export default function Home() {
               <span>Thực đơn sản phẩm</span>
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              Dữ liệu lấy từ API NestJS: GET /products
+            
             </p>
           </div>
 
@@ -100,7 +151,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 1. Trạng thái Loading (Loading state) */}
+        {/* 1. Trạng thái Loading */}
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 py-6">
             {[1, 2, 3, 4].map((i) => (
@@ -113,7 +164,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2. Trạng thái Trống (Empty state) */}
+        {/* 2. Trạng thái Trống */}
         {!loading && !error && products.length === 0 && (
           <div className="mx-auto max-w-md rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center shadow-sm my-8">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-3">
@@ -136,7 +187,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 3. Lưới sản phẩm (Product Grid) */}
+        {/* 3. Lưới sản phẩm */}
         {!loading && !error && products.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((product) => (

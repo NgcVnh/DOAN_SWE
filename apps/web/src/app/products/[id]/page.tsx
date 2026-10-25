@@ -28,6 +28,7 @@ import {
 } from '../../../data/coffeeProducts';
 import { useCartStore } from '../../../store/useCartStore';
 import { CartBadge } from '../../../components/CartBadge';
+import { getStoredUser } from '@/lib/auth';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -113,6 +114,17 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const handleAddToCart = async () => {
     if (!product) return;
+
+    // Bắt buộc phải đăng nhập thì mới được thêm vào giỏ
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      router.push(
+        `/login?redirect=${encodeURIComponent(`/products/${productId}`)}&notice=${encodeURIComponent(
+          'Vui lòng đăng ký hoặc đăng nhập tài khoản để thêm món vào giỏ hàng!',
+        )}`,
+      );
+      return;
+    }
     setIsAdding(true);
     addToCart({
       productId: product.id,
