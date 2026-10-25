@@ -78,7 +78,7 @@ npm --prefix apps/web install
 npm run dev:api
 
 # Chạy Frontend Web (Port 3000)
-npm run dev:web
+npm run dev:api
 ```
 
 ---
