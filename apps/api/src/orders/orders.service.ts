@@ -1,27 +1,29 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {BadRequestException,Injectable,NotFoundException,} from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { randomUUID } from 'crypto';
+import { canTransition } from './order-state-machine.js';
+
 
 // Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
-const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.PENDING]: [
-    OrderStatus.PAID,
-    OrderStatus.PAYMENT_FAILED,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAYMENT_FAILED]: [
-    OrderStatus.PAID,
-    OrderStatus.PENDING,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  [OrderStatus.PREPARING]: [OrderStatus.READY],
-  [OrderStatus.READY]: [OrderStatus.COMPLETED],
-  [OrderStatus.COMPLETED]: [],
-  [OrderStatus.CANCELLED]: [],
-};
+// const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+//   [OrderStatus.PENDING]: [
+//     OrderStatus.PAID,
+//     OrderStatus.PAYMENT_FAILED,
+//     OrderStatus.CANCELLED,
+//   ],
+//   [OrderStatus.PAYMENT_FAILED]: [
+//     OrderStatus.PAID,
+//     OrderStatus.PENDING,
+//     OrderStatus.CANCELLED,
+//   ],
+//   [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+//   [OrderStatus.PREPARING]: [OrderStatus.READY],
+//   [OrderStatus.READY]: [OrderStatus.COMPLETED],
+//   [OrderStatus.COMPLETED]: [],
+//   [OrderStatus.CANCELLED]: [],
+// };
 
 @Injectable()
 export class OrdersService {
@@ -87,7 +89,9 @@ export class OrdersService {
       (o) => o.orderCode === orderCode || o.id === orderCode,
     );
     if (!order) {
-      throw new NotFoundException(`Không tìm thấy đơn hàng với mã: ${orderCode}`);
+      throw new NotFoundException(
+        `Không tìm thấy đơn hàng với mã: ${orderCode}`,
+      );
     }
     return order;
   }
@@ -98,16 +102,19 @@ export class OrdersService {
     );
   }
 
+  //Chuyen trang thai
   transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Order {
     const order = this.findByCode(orderCode);
-    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowedNext.includes(nextStatus)) {
+
+    if (!canTransition(order.status, nextStatus)) {
       throw new BadRequestException(
         `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
       );
     }
+
     order.status = nextStatus;
     order.updatedAt = new Date();
+
     return order;
   }
 }

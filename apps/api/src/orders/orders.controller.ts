@@ -48,6 +48,7 @@ export class OrdersController {
   }
 
   @Patch(':orderCode/status')
+  @UseGuards(JwtAuthGuard)
   async updateStatus(
     @Param('orderCode') orderCode: string,
     @Body() updateStatusDto: UpdateOrderStatusDto,
