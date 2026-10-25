@@ -25,75 +25,11 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 @Injectable()
 export class OrdersService {
-  private readonly orders: Order[] = [
-    {
-      id: 'ord-sample-1042',
-      orderCode: 'ORD-1042',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '3',
-          quantity: 1,
-          size: DrinkSize.M,
-          toppings: ['Kem Cheese'],
-          unitPrice: 63000,
-        },
-        {
-          productId: '4',
-          quantity: 2,
-          size: DrinkSize.L,
-          toppings: ['Thạch nha đam'],
-          unitPrice: 57000,
-        },
-      ],
-      status: OrderStatus.PAID,
-      totalAmount: 177000,
-      promoCode: 'BREWLITE10',
-      pointsToUse: 0,
-      createdAt: new Date(Date.now() - 1000 * 60 * 15), // 15 phút trước
-      updatedAt: new Date(Date.now() - 1000 * 60 * 14),
-    },
-    {
-      id: 'ord-sample-1039',
-      orderCode: 'ORD-1039',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '1',
-          quantity: 2,
-          size: DrinkSize.M,
-          toppings: [],
-          unitPrice: 41000,
-        },
-      ],
-      status: OrderStatus.PREPARING,
-      totalAmount: 82000,
-      createdAt: new Date(Date.now() - 1000 * 60 * 45), // 45 phút trước
-      updatedAt: new Date(Date.now() - 1000 * 60 * 30),
-    },
-    {
-      id: 'ord-sample-1028',
-      orderCode: 'ORD-1028',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '5',
-          quantity: 1,
-          size: DrinkSize.L,
-          toppings: ['Trân châu đen', 'Kem Cheese'],
-          unitPrice: 74000,
-        },
-      ],
-      status: OrderStatus.COMPLETED,
-      totalAmount: 74000,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24), // Hôm qua
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 23),
-    },
-  ];
+  private readonly orders: Order[] = [];
 
   createOrder(
     createOrderDto: CreateOrderDto,
-    userId: string = 'user-default-id',
+    userId: string | number = '0',
   ): Order {
     const timestamp = Date.now();
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -116,7 +52,7 @@ export class OrdersService {
           ? crypto.randomUUID()
           : randomUUID(),
       orderCode,
-      userId,
+      userId: String(userId),
       items: createOrderDto.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -135,11 +71,11 @@ export class OrdersService {
 
     return newOrder;
   }
-
-  findByUserId(userId: string, status?: OrderStatus): Order[] {
+  findByUserId(userId: string | number, status?: OrderStatus): Order[] {
+    const targetUserId = String(userId);
     return this.orders
       .filter((order) => {
-        const matchUser = order.userId === userId;
+        const matchUser = String(order.userId) === targetUserId;
         const matchStatus = status ? order.status === status : true;
         return matchUser && matchStatus;
       })
@@ -175,5 +111,3 @@ export class OrdersService {
     return order;
   }
 }
-
-

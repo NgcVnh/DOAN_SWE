@@ -1,3 +1,28 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
+# Hướng dẫn Triển khai (Deployment Guide)
+
+## 1. Chạy môi trường Local bằng Docker Compose
+```bash
+docker compose up --build
+```
+
+## 2. Chạy môi trường Phát triển (Development)
+```bash
+# Cài đặt và đồng bộ Database
+npm run db:push
+npm run db:seed
+
+# Chạy Backend (Port 3001)
+npm run dev:api
+
+# Chạy Frontend (Port 3000)
+npm run dev:web
+```
+
+=======
+=======
+>>>>>>> origin/Nhanbranch
 # Hướng dẫn triển khai (Deployment Guide) — BrewLite
 
 Tài liệu hướng dẫn triển khai hệ thống **BrewLite** cho môi trường phát triển cục bộ (Local Development) và môi trường thực tế (Cloud / Production).
@@ -86,4 +111,8 @@ Hệ thống cung cấp sẵn file `docker-compose.yml` để khởi chạy đ�
 - Nền tảng khuyến nghị: **Vercel** (tối ưu hóa hoàn hảo cho Next.js).
 - Root Directory trong thiết lập Vercel: `apps/web`.
 - Biến môi trường: `NEXT_PUBLIC_API_URL=https://api.yourdomain.com`
+<<<<<<< HEAD
+>>>>>>> origin/Nhanbranch
+=======
 
+>>>>>>> origin/Nhanbranch
