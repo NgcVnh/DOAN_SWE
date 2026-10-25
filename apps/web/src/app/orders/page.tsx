@@ -22,6 +22,7 @@ import {
 import { Header } from '../../components/Header';
 import { useCartStore } from '../../store/useCartStore';
 import { COFFEE_TOPPINGS } from '../../data/coffeeProducts';
+import { getAuthToken } from '../../lib/auth';
 import {
   OrderView,
   OrderStatusType,
@@ -86,7 +87,11 @@ export default function OrderHistoryPage(): React.JSX.Element {
     setActionError(null);
 
     try {
+      const token = getAuthToken();
       const response = await fetch(`${apiUrl}/orders/me`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         cache: 'no-store',
       });
 
