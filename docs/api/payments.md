@@ -162,3 +162,4 @@ Module thanh toán (`PaymentsModule`) áp dụng các nguyên lý **OOP & SOLID*
   - `PAYMENT_FAILED` $\rightarrow$ `PAID` (thử lại thành công với khóa `idempotencyKey` mới)
 - **Bị chặn (Ném `BadRequestException`):**
   - Mọi yêu cầu thanh toán cho đơn hàng đã `PAID`, `PREPARING`, `READY`, `COMPLETED`, hoặc `CANCELLED`.
+

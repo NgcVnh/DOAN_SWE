@@ -296,3 +296,4 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(singleRes.body.idempotencyKey).toBe(key);
   });
 });
+
