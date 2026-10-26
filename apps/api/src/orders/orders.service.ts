@@ -38,6 +38,67 @@ export class OrdersService {
   private readonly orders: Order[] = [];
   private readonly mutex = new AsyncMutex();
 
+  constructor() {
+    if (process.env.NODE_ENV !== 'test') {
+      this.seedInitialOrders();
+    }
+  }
+
+  private seedInitialOrders() {
+    const demoOrders: Order[] = [
+      {
+        id: 'demo-ord-1',
+        orderCode: 'ORD-20261026-001',
+        userId: '1',
+        items: [
+          { productId: '1', quantity: 2, size: DrinkSize.M, toppings: ['Trân châu'] },
+        ],
+        status: OrderStatus.PREPARING,
+        totalAmount: 85000,
+        createdAt: new Date(Date.now() - 3600000 * 2),
+        updatedAt: new Date(Date.now() - 3600000 * 2),
+      },
+      {
+        id: 'demo-ord-2',
+        orderCode: 'ORD-20261026-002',
+        userId: '1',
+        items: [
+          { productId: '2', quantity: 1, size: DrinkSize.L, toppings: [] },
+        ],
+        status: OrderStatus.COMPLETED,
+        totalAmount: 45000,
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        id: 'demo-ord-3',
+        orderCode: 'ORD-20261026-003',
+        userId: '2',
+        items: [
+          { productId: '3', quantity: 1, size: DrinkSize.M, toppings: ['Thạch phô mai'] },
+        ],
+        status: OrderStatus.READY,
+        totalAmount: 45000,
+        createdAt: new Date(Date.now() - 1800000),
+        updatedAt: new Date(Date.now() - 1800000),
+      },
+      {
+        id: 'demo-ord-4',
+        orderCode: 'ORD-20261026-004',
+        userId: '3',
+        items: [
+          { productId: '1', quantity: 1, size: DrinkSize.S, toppings: [] },
+        ],
+        status: OrderStatus.PAID,
+        totalAmount: 35000,
+        createdAt: new Date(Date.now() - 900000),
+        updatedAt: new Date(Date.now() - 900000),
+      },
+    ];
+
+    this.orders.push(...demoOrders);
+  }
+
   // =========================================================================
   // TASK 10.2: QUẢN LÝ TỒN KHO & KIỂM SOÁT ĐỒNG THỜI (CONCURRENCY CONTROL)
   // Bảng theo dõi số lượng tồn kho của từng sản phẩm trong kho

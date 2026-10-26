@@ -27,7 +27,36 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    void this.seedInMemoryUsers();
+  }
+
+  private async seedInMemoryUsers() {
+    const defaultUsers = [
+      { id: 1, email: 'customer@brewlite.vn', fullName: 'Khách hàng Thử Nghiệm', password: '123456', loyaltyPoints: 100 },
+      { id: 2, email: 'dhnam111@gmail.com', fullName: 'Đặng Hoàng Nam', password: '123456', loyaltyPoints: 50 },
+      { id: 3, email: 'nam', fullName: 'nam', password: '123456', loyaltyPoints: 20 },
+      { id: 4, email: 'nam@gmail.com', fullName: 'nam', password: '123456', loyaltyPoints: 20 },
+    ];
+
+    for (const u of defaultUsers) {
+      const passwordHash = await bcrypt.hash(u.password, 10);
+      const userObj = {
+        id: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        passwordHash,
+        loyaltyPoints: u.loyaltyPoints,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.inMemoryUsersByEmail.set(u.email, userObj);
+      this.inMemoryUsersById.set(u.id, userObj);
+      if (u.id >= this.nextUserId) {
+        this.nextUserId = u.id + 1;
+      }
+    }
+  }
 
   /**
    * Đăng ký tài khoản mới
