@@ -64,7 +64,6 @@ US-05-Tạo đơn hàng
 
 UserStory 6: Xác nhận lịch sử đơn hàng
 
-
 US-06-Xác nhận lịch sử đơn hàng
   Là một khách hàng tôi muốn xem lại thông tin xác nhận và lịch sử đơn hàng để tôi kiểm tra mã đơn và trạng thái đơn hàng đó
     Tiêu chí chấp nhận (Acceptance Criteria):
@@ -74,4 +73,3 @@ US-06-Xác nhận lịch sử đơn hàng
       Mỗi đơn hàng trong lịch sử hiển thị tối thiểu mã đơn hàng, tổng tiền, thời gian tạo và trạng thái đơn. 
       ếu khách hàng chưa có đơn hàng nào, hệ thống hiển thị thông báo lịch sử đơn hàng trống. 
       Khách hàng không được xem lịch sử đơn hàng của tài khoản khác. 
-

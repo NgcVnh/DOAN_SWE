@@ -22,7 +22,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate --skip-download"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { randomUUID } from 'crypto';
+import { canTransition } from './order-state-machine.js';
 
 /**
  * Lớp Mutex xử lý kiểm soát đồng thời (Concurrency Control / Race-Condition Prevention)
@@ -27,25 +32,6 @@ class AsyncMutex {
     }
   }
 }
-
-// Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
-const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.PENDING]: [
-    OrderStatus.PAID,
-    OrderStatus.PAYMENT_FAILED,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAYMENT_FAILED]: [
-    OrderStatus.PAID,
-    OrderStatus.PENDING,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  [OrderStatus.PREPARING]: [OrderStatus.READY, OrderStatus.CANCELLED],
-  [OrderStatus.READY]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
-  [OrderStatus.COMPLETED]: [],
-  [OrderStatus.CANCELLED]: [],
-};
 
 @Injectable()
 export class OrdersService {
@@ -96,20 +82,17 @@ export class OrdersService {
       // -------------------------------------------------------------
       // BƯỚC 2: TRANSACTION NGUYÊN TỬ (Atomic Deduction & Order Creation)
       // Đảm bảo tạo đơn và trừ kho hoàn toàn nhất quán.
-      // Nếu có bất kỳ lỗi nào xảy ra -> Tự động ROLLBACK.
       // -------------------------------------------------------------
-      const deductedItems: { productId: string; qty: number }[] = [];
+      const deductedItems: Array<{ productId: string; qty: number }> = [];
 
       try {
-        // Thực hiện trừ kho từng món
+        // Trừ tồn kho từng sản phẩm
         for (const item of createOrderDto.items) {
           const currentStock = this.getProductStock(item.productId);
-          const newStock = currentStock - item.quantity;
-          this.setProductStock(item.productId, newStock);
+          this.setProductStock(item.productId, currentStock - item.quantity);
           deductedItems.push({ productId: item.productId, qty: item.quantity });
         }
 
-        // Tạo mã đơn và tính tổng tiền
         const timestamp = Date.now();
         const randomSuffix = Math.floor(1000 + Math.random() * 9000);
         const orderCode = `ORD-${timestamp}-${randomSuffix}`;
@@ -163,7 +146,7 @@ export class OrdersService {
     const targetUserId = String(userId);
     return this.orders
       .filter((order) => {
-        const matchUser = String(order.userId) === targetUserId;
+        const matchUser = order.userId === targetUserId;
         const matchStatus = status ? order.status === status : true;
         return matchUser && matchStatus;
       })
@@ -175,7 +158,9 @@ export class OrdersService {
       (o) => o.orderCode === orderCode || o.id === orderCode,
     );
     if (!order) {
-      throw new NotFoundException(`Không tìm thấy đơn hàng với mã: ${orderCode}`);
+      throw new NotFoundException(
+        `Không tìm thấy đơn hàng với mã: ${orderCode}`,
+      );
     }
     return order;
   }
@@ -192,8 +177,8 @@ export class OrdersService {
    */
   transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Order {
     const order = this.findByCode(orderCode);
-    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowedNext.includes(nextStatus)) {
+
+    if (!canTransition(order.status, nextStatus)) {
       throw new BadRequestException(
         `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
       );
@@ -209,6 +194,7 @@ export class OrdersService {
 
     order.status = nextStatus;
     order.updatedAt = new Date();
+
     return order;
   }
 
@@ -241,4 +227,3 @@ export class OrdersService {
     return stocks;
   }
 }
-

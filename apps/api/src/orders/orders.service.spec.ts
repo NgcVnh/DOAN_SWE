@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { OrdersService } from './orders.service.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
-import { BadRequestException } from '@nestjs/common';
 
-describe('OrdersService - Task 10.2 Kiểm soát tồn kho & Transaction', () => {
+describe('OrdersService - Task 10 (State Machine & Concurrency Control)', () => {
   let service: OrdersService;
 
   beforeEach(async () => {
@@ -13,6 +13,20 @@ describe('OrdersService - Task 10.2 Kiểm soát tồn kho & Transaction', () =>
 
     service = module.get<OrdersService>(OrdersService);
   });
+
+  // Helper tạo đơn hàng kiểm thử
+  async function createTestOrder() {
+    return service.createOrder({
+      items: [
+        {
+          productId: 'prod-1',
+          quantity: 1,
+          size: DrinkSize.M,
+          toppings: ['Trân châu'],
+        },
+      ],
+    });
+  }
 
   it('Khởi tạo OrdersService thành công', () => {
     expect(service).toBeDefined();
@@ -155,7 +169,87 @@ describe('OrdersService - Task 10.2 Kiểm soát tồn kho & Transaction', () =>
   });
 
   // =========================================================================
-  // 3. KIỂM THỬ HOÀN TRẢ TỒN KHO KHI HỦY ĐƠN (RESTORATION OF STOCK)
+  // 3. KIỂM THỬ ORDER STATE MACHINE (CHUYỂN TRẠNG THÁI HỢP LỆ & CHẶN LỖI)
+  // =========================================================================
+  describe('Order State Machine', () => {
+    it('should find an order by orderCode', async () => {
+      const created = await createTestOrder();
+      const found = service.findByCode(created.orderCode);
+      expect(found).toBeDefined();
+      expect(found.orderCode).toBe(created.orderCode);
+    });
+
+    it('should transition PENDING to PAID', async () => {
+      const created = await createTestOrder();
+      const updated = service.transitionOrderStatus(created.orderCode, OrderStatus.PAID);
+      expect(updated.status).toBe(OrderStatus.PAID);
+    });
+
+    it('should transition PENDING to PAYMENT_FAILED', async () => {
+      const created = await createTestOrder();
+      const updated = service.transitionOrderStatus(created.orderCode, OrderStatus.PAYMENT_FAILED);
+      expect(updated.status).toBe(OrderStatus.PAYMENT_FAILED);
+    });
+
+    it('should transition PREPARING to READY', async () => {
+      const created = await createTestOrder();
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PAID);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PREPARING);
+      const updated = service.transitionOrderStatus(created.orderCode, OrderStatus.READY);
+      expect(updated.status).toBe(OrderStatus.READY);
+    });
+
+    it('should transition READY to COMPLETED', async () => {
+      const created = await createTestOrder();
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PAID);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PREPARING);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.READY);
+      const updated = service.transitionOrderStatus(created.orderCode, OrderStatus.COMPLETED);
+      expect(updated.status).toBe(OrderStatus.COMPLETED);
+    });
+
+    it('should reject COMPLETED to PENDING', async () => {
+      const created = await createTestOrder();
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PAID);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.PREPARING);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.READY);
+      service.transitionOrderStatus(created.orderCode, OrderStatus.COMPLETED);
+
+      expect(() =>
+        service.transitionOrderStatus(created.orderCode, OrderStatus.PENDING),
+      ).toThrow(BadRequestException);
+    });
+
+    it('should reject CANCELLED to PAID', async () => {
+      const created = await createTestOrder();
+      service.transitionOrderStatus(created.orderCode, OrderStatus.CANCELLED);
+
+      expect(() =>
+        service.transitionOrderStatus(created.orderCode, OrderStatus.PAID),
+      ).toThrow(BadRequestException);
+    });
+
+    it('should reject transitioning to the same status', async () => {
+      const created = await createTestOrder();
+      expect(() =>
+        service.transitionOrderStatus(created.orderCode, OrderStatus.PENDING),
+      ).toThrow(BadRequestException);
+    });
+
+    it('should update updatedAt after a successful transition', async () => {
+      const created = await createTestOrder();
+      const previousUpdatedAt = created.updatedAt.getTime();
+
+      // Đợi một chút để timestamp mới có thể khác timestamp cũ.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      const updated = service.transitionOrderStatus(created.orderCode, OrderStatus.PAID);
+      expect(updated.updatedAt.getTime()).toBeGreaterThan(previousUpdatedAt);
+    });
+  });
+
+  // =========================================================================
+  // 4. KIỂM THỬ HOÀN TRẢ TỒN KHO KHI HỦY ĐƠN (RESTORATION OF STOCK)
   // =========================================================================
   describe('Hoàn trả tồn kho khi đơn hàng bị CANCELLED', () => {
     it('Tự động hoàn trả đúng số lượng tồn kho khi đơn hàng bị CANCELLED', async () => {

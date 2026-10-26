@@ -73,6 +73,9 @@ export class PaymentsService {
     // BƯỚC 3: GỌI CỔNG THANH TOÁN THEO ĐA HÌNH (POLYMORPHISM)
     // =========================================================================
     const strategy = this.strategies[dto.method];
+    if (!strategy) {
+      throw new BadRequestException(`Phương thức thanh toán không hợp lệ: ${dto.method}`);
+    }
     const gatewayResult = await strategy.charge(order.total, dto.mockSuccess ?? true);
 
     // =========================================================================
