@@ -3,9 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export const LOYALTY_CONSTANTS = {
-  // 1 điểm tích lũy quy đổi thành 1.000 VNĐ giảm giá
   POINT_VALUE_IN_VND: 1000,
-  // Cứ mỗi 10.000 VNĐ thanh toán thực tế sẽ tích lũy 1 điểm thưởng
   VND_PER_EARNED_POINT: 10000,
 };
 
@@ -13,9 +11,6 @@ export const LOYALTY_CONSTANTS = {
 export class LoyaltyPointsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Tính số điểm thưởng tích lũy được dựa trên số tiền thanh toán thực tế
-   */
   calculatePointsEarned(paidAmount: number): number {
     if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
       return 0;
@@ -50,7 +45,6 @@ export class LoyaltyPointsService {
 
     const potentialDiscount = pointsToUse * LOYALTY_CONSTANTS.POINT_VALUE_IN_VND;
 
-    // Không cho phép giảm quá số tiền còn lại của đơn hàng
     if (potentialDiscount > maxAllowedDiscount) {
       const discountAmount = Math.max(0, maxAllowedDiscount);
       const pointsActuallyUsed = Math.ceil(discountAmount / LOYALTY_CONSTANTS.POINT_VALUE_IN_VND);
@@ -63,9 +57,6 @@ export class LoyaltyPointsService {
     };
   }
 
-  /**
-   * Khấu trừ điểm của người dùng trong transaction an toàn
-   */
   async deductPointsInTransaction(
     tx: Prisma.TransactionClient,
     userId: number,
@@ -88,9 +79,6 @@ export class LoyaltyPointsService {
     });
   }
 
-  /**
-   * Cộng điểm tích lũy cho người dùng trong transaction
-   */
   async addPointsInTransaction(
     tx: Prisma.TransactionClient,
     userId: number,

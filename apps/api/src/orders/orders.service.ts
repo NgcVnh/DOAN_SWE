@@ -265,7 +265,6 @@ export class OrdersService {
     if (order.status === nextStatus) {
       return order;
     }
-    
     assertTransition(order.status, nextStatus);
     const orderId = Number(order.id);
     if (Number.isInteger(orderId) && orderId > 0) {
