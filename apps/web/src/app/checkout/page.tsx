@@ -29,8 +29,10 @@ function CheckoutContent(): React.JSX.Element {
   // State lưu phương thức thanh toán người dùng chọn (Ví điện tử hoặc Thẻ ngân hàng)
   const [method, setMethod] = useState<PaymentMethodType>('WALLET');
 
-  // State giả lập lỗi để demo kịch bản PAYMENT_FAILED cho giảng viên
-  const [mockSuccess, setMockSuccess] = useState<boolean>(true);
+  // Hỗ trợ kích hoạt ngầm qua URL ?fail=true hoặc double-click tiêu đề khi cần demo kịch bản lỗi
+  const [forceFail, setForceFail] = useState<boolean>(
+    searchParams.get('fail') === 'true' || searchParams.get('mockFail') === 'true',
+  );
 
   // State quản lý trạng thái gọi API
   const [loading, setLoading] = useState<boolean>(false);
@@ -56,7 +58,13 @@ function CheckoutContent(): React.JSX.Element {
     setErrorMessage(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const token = getAuthToken();
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
     let currentOrderCode = activeOrderCode;
+    let returnedOrderId: number | string = orderId;
 
     try {
       // 1. Nếu chưa có mã đơn (đặt mới từ giỏ hàng), gọi POST /orders để lưu vào Lịch sử đơn (GET /orders/me)
@@ -85,12 +93,11 @@ function CheckoutContent(): React.JSX.Element {
               ];
 
         try {
-          const token = getAuthToken();
           const createOrderRes = await fetch(`${apiUrl}/orders`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...authHeaders,
             },
             body: JSON.stringify({ items: orderPayloadItems }),
           });
@@ -105,6 +112,13 @@ function CheckoutContent(): React.JSX.Element {
             ) {
               currentOrderCode = (createdOrder as { orderCode: string }).orderCode;
               setActiveOrderCode(currentOrderCode);
+
+              if ('id' in createdOrder) {
+                const parsedId = parseInt(String((createdOrder as { id: unknown }).id), 10);
+                if (Number.isFinite(parsedId) && parsedId > 0) {
+                  returnedOrderId = parsedId;
+                }
+              }
             }
           }
         } catch {
@@ -114,18 +128,24 @@ function CheckoutContent(): React.JSX.Element {
 
       // 2. Gọi POST /payments kèm Idempotency Key
       const idempotencyKey = crypto.randomUUID();
+      const mockSuccess = !forceFail;
       let paymentSucceeded = mockSuccess;
-      let returnedOrderId: number | string = orderId;
       let serverErrorMessage: string | null = null;
+
+      if (forceFail) {
+        // Tắt cờ lỗi để lần bấm "Thử thanh toán lại" tiếp theo sẽ thành công
+        setForceFail(false);
+      }
 
       try {
         const response = await fetch(`${apiUrl}/payments`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...authHeaders,
           },
           body: JSON.stringify({
-            orderId: orderId,
+            orderId: returnedOrderId,
             method: method,
             idempotencyKey: idempotencyKey,
             mockSuccess: mockSuccess,
@@ -148,7 +168,6 @@ function CheckoutContent(): React.JSX.Element {
           }
         }
       } catch {
-        // Nếu DB Prisma chưa có đơn #1, sử dụng kết quả từ cổng giả lập và đồng bộ sang OrdersService
         paymentSucceeded = mockSuccess;
       }
 
@@ -157,7 +176,10 @@ function CheckoutContent(): React.JSX.Element {
         try {
           await fetch(`${apiUrl}/orders/${encodeURIComponent(currentOrderCode)}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
             body: JSON.stringify({
               status: paymentSucceeded ? 'PAID' : 'PAYMENT_FAILED',
             }),
@@ -251,7 +273,18 @@ function CheckoutContent(): React.JSX.Element {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-xl font-bold text-center text-slate-800">Thanh toán</h1>
+          <h1
+            className="text-xl font-bold text-center text-slate-800 select-none cursor-pointer"
+            onDoubleClick={() => setForceFail((prev) => !prev)}
+            title={
+              forceFail
+                ? 'Chế độ giả lập lỗi đang BẬT (Double-click để tắt)'
+                : 'Double-click để bật chế độ giả lập lỗi'
+            }
+          >
+            Thanh toán
+            {forceFail && <span className="ml-1 text-xs text-rose-500 font-normal">(Test lỗi)</span>}
+          </h1>
           <div className="w-8" />
         </div>
 
@@ -309,20 +342,6 @@ function CheckoutContent(): React.JSX.Element {
               <p className="text-xs text-slate-500">Thanh toán qua cổng thẻ nội địa hoặc quốc tế</p>
             </div>
           </label>
-        </div>
-
-        {/* Tùy chọn phục vụ lúc Demo cho giảng viên */}
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-4 text-xs text-slate-600 flex items-center justify-between">
-          <span>Chế độ giả lập (Demo cho giảng viên):</span>
-          <button
-            type="button"
-            onClick={() => setMockSuccess(!mockSuccess)}
-            className={`px-2.5 py-1 rounded font-semibold ${
-              mockSuccess ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-            }`}
-          >
-            {mockSuccess ? 'Giả lập: THÀNH CÔNG' : 'Giả lập: THẤT BẠI (Lỗi)'}
-          </button>
         </div>
 
         {/* Hiển thị lỗi khi thanh toán thất bại (PAYMENT_FAILED) */}
