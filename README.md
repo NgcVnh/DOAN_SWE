@@ -1,94 +1,77 @@
 # BrewLite — Mobile-First Coffee & Beverage Ordering Platform
+UserStory 1: Quản lý giỏ hàng
 
-<p align="center">
-  <strong>Nền tảng đặt đồ uống cà phê trực tuyến hiện đại với kiến trúc Monorepo, Next.js PWA & NestJS Clean Architecture</strong>
-</p>
+US-01- Quản lý giỏ hàng
+  Là một khách hàng, tôi muốn thêm, thay đổi số lượng và xóa đồ uống trong giỏ hàng, để điều chỉnh đơn hàng trước khi thanh toán
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi khách hàng chọn một sản phẩm và thêm vào giỏ, sản phẩm xuất hiện trong giỏ hàng
+      Khi khách hàng thay đổi số lượng, số lượng mới và thành tiền được cập nhật
+      Khi xóa sản phẩm, sản phẩm đó không còn trong giỏ hàng
+      Tổng tiền được tính lại khi khách thêm, sửa, xóa sản phẩm
+      Khi giỏ hàng trống, tổng tiền phải bằng không và giao diện thể hiện giỏ trống 
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js%2015-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-</p>
 
----
+UserStory 2: Chi tiết sản phẩm
 
-## 📖 Giới thiệu (Overview)
 
-**BrewLite** là đồ án môn học Kỹ thuật Phần mềm (Software Engineering). Dự án hướng đến việc giải quyết bài toán đặt món và tùy biến đồ uống tại chuỗi cửa hàng cà phê thông qua giải pháp **Mobile-First Progressive Web App (PWA)** kết hợp backend chuẩn **Clean Architecture / Domain-Driven Design (DDD)**.
+US-02 - Chi tiết sản phẩm
+  Là một khách hàng, tôi muốn xem chi tiết sản phẩm và lựa chọn kích thước, topping để tùy chỉnh đồ uống theo sở thích 
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi khách hàng chọn một sản phẩm trên trang menu, hệ thống hiển thị thông tin chi tiết của sản phẩm bao gồm hình ảnh, tên, giá
+      Hệ thống cho phép khách hàng chọn size S, M, L
+      Hệ thống cho phép khách hàng chọn topping có sẵn
+      Khi khách hàng thay đổi size hay topping, giá phải được cập nhật theo các tùy chọn đã chọn 
+      Khi khách hàng nhấn nút “Thêm giỏ vào hàng” sản phẩm với tùy chọn được thêm vào giỏ
 
----
 
-## 📂 Cấu trúc thư mục chuẩn (Project Structure)
+UserStory 3: Đăng ký và đăng nhập tài khoản
 
-```text
-brewlite/
-├── apps/
-│   ├── web/                     # Next.js mobile-first / PWA
-│   └── api/                     # NestJS backend
-├── docs/
-│   ├── requirements/            # Task 1: Đặc tả yêu cầu phần mềm (SRS)
-│   ├── diagrams/                # Task 2: Các biểu đồ UML & ERD (Mermaid)
-│   ├── architecture/            # Task 3: Thiết kế kiến trúc Clean Architecture & Monorepo
-│   ├── traceability-matrix.md   # Ma trận truy vết yêu cầu (Traceability Matrix)
-│   └── deployment.md            # Hướng dẫn triển khai (Local & Cloud)
-├── tests/                       # Bộ kiểm thử tích hợp & E2E
-├── .github/workflows/           # CI/CD GitHub Actions
-├── docker-compose.yml           # Khởi chạy toàn bộ hệ thống bằng Docker
-├── .env.example                 # Mẫu cấu hình biến môi trường
-└── README.md                    # Tài liệu hướng dẫn chính
-```
 
----
+US-03-Đăng ký và đăng nhập tài khoản
+  Là một khách hàng, tôi muốn đăng ký đăng nhập tài khoản Brew Lite để sử dụng các chức năng đặt hàng 
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi khách hàng cung cấp thông tin đăng ký hợp lệ thì tạo tài khoản mới
+      Nếu thông tin đăng ký không hợp lệ hay email đã tồn tại, hệ thống thông báo lỗi phù hợp
+      Khi khách nhập đúng email và mật khẩu thì hệ thống đăng nhập vào trang chủ
+      Mật khẩu được băm khi đưa vào cơ sở dữ liệu
+      Khi người dùng chưa đăng nhập truy cập chức năng đặt hàng thì hệ thống yêu cầu đăng nhập
 
-## 📑 Tài liệu chi tiết các Task (Documentation)
 
-- **Task 1 — Đặc tả yêu cầu (Requirements):** Xem chi tiết tại [docs/requirements/README.md](docs/requirements/README.md).
-- **Task 2 — Thiết kế biểu đồ (Diagrams):** Xem chi tiết tại [docs/diagrams/README.md](docs/diagrams/README.md) (Use Case, Sequence, ERD, State Machine).
-- **Task 3 — Thiết kế kiến trúc (Architecture):** Xem chi tiết tại [docs/architecture/README.md](docs/architecture/README.md) (Clean Architecture, DDD, Monorepo).
-- **Ma trận truy vết (Traceability Matrix):** [docs/traceability-matrix.md](docs/traceability-matrix.md).
-- **Hướng dẫn triển khai (Deployment Guide):** [docs/deployment.md](docs/deployment.md).
+UserStory 4: Thanh toán không tiền mặt
 
----
+US-04-Thanh toán không tiền mặt
+  Là một khách hàng, tôi muốn thanh toán đơn hàng bằng ví điện tử/ thẻ để tôi không cần mang tiền mặt
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi giỏ hàng có ít nhất một sản phẩm, nút “Thanh toán” hiển thị tổng tiền
+      Chọn phương thức (Ví/ Thẻ) rồi xác nhận hệ thống tạo đơn hàng ở trạng thái PAID
+      Nếu thanh toán lỗi, đơn ở trạng thái PAYMENT FAILED và giỏ được giữ nguyên
+      Sau khi thanh toán thành công, hiển thị mã đơn hàng và màn hình xác nhận
 
-## 🚀 Khởi động nhanh (Quick Start)
 
-### Cách 1: Sử dụng Docker Compose (Khuyến nghị)
+UserStory 5: Tạo đơn hàng
 
-```bash
-cp .env.example .env
-docker compose up --build -d
-```
-- **Web App (PWA):** [http://localhost:3000](http://localhost:3000)
-- **API Backend:** [http://localhost:3001](http://localhost:3001)
 
-### Cách 2: Chạy trực tiếp qua npm
+US-05-Tạo đơn hàng
+  Là một khách hàng đã đăng nhập, tôi muốn tạo đơn hàng từ các sản phẩm trong giỏ hàng, để đặt mua đồ uống trên BrewLite. 
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi khách hàng gửi yêu cầu đặt hàng với giỏ hàng hợp lệ, hệ thống kiểm tra dữ liệu đầu vào trước khi tạo đơn. 
+      Nếu giỏ hàng có ít nhất một sản phẩm hợp lệ và đáp ứng điều kiện đặt hàng, hệ thống tạo đơn hàng và lưu vào cơ sở dữ liệu. 
+      Đơn hàng mới được tạo có trạng thái ban đầu là PENDING 
+      Sau khi tạo đơn thành công, hệ thống trả về mã đơn hàng cho khách hàng. 
+      Nếu dữ liệu đặt hàng không hợp lệ, hệ thống từ chối yêu cầu và trả về thông báo lỗi phù hợp. 
+      Chỉ người dùng đã đăng nhập mới được tạo đơn hàng. 
 
-1. **Cài đặt thư viện:**
-```bash
-npm install
-npm --prefix apps/api install
-npm --prefix apps/web install
-```
 
-2. **Chạy đồng thời cả Frontend và Backend:**
-```bash
-# Chạy Backend (Port 3001)
-npm run dev:api
+UserStory 6: Xác nhận lịch sử đơn hàng
 
-# Chạy Frontend Web (Port 3000)
-npm run dev:web
-```
 
----
+US-06-Xác nhận lịch sử đơn hàng
+  Là một khách hàng tôi muốn xem lại thông tin xác nhận và lịch sử đơn hàng để tôi kiểm tra mã đơn và trạng thái đơn hàng đó
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Sau khi đặt hàng thành công, hệ thống hiển thị mã đơn hàng và trạng thái hiện tại của đơn. 
+      Sau khi thanh toán thành công, hệ thống hiển thị trạng thái PAID trên màn hình 
+      Khi khách hàng truy cập lịch sử đơn hàng, hệ thống hiển thị danh sách các đơn hàng thuộc tài khoản đang đăng nhập. 
+      Mỗi đơn hàng trong lịch sử hiển thị tối thiểu mã đơn hàng, tổng tiền, thời gian tạo và trạng thái đơn. 
+      ếu khách hàng chưa có đơn hàng nào, hệ thống hiển thị thông báo lịch sử đơn hàng trống. 
+      Khách hàng không được xem lịch sử đơn hàng của tài khoản khác. 
 
-## 🧪 Kiểm thử (Testing)
-
-```bash
-# Chạy unit tests backend
-npm --prefix apps/api run test
-
-# Chạy E2E tests
-npm run test
-```
