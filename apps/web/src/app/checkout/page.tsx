@@ -29,11 +29,6 @@ function CheckoutContent(): React.JSX.Element {
   // State lưu phương thức thanh toán người dùng chọn (Ví điện tử hoặc Thẻ ngân hàng)
   const [method, setMethod] = useState<PaymentMethodType>('WALLET');
 
-  // Hỗ trợ kích hoạt ngầm qua URL ?fail=true hoặc double-click tiêu đề khi cần demo kịch bản lỗi
-  const [forceFail, setForceFail] = useState<boolean>(
-    searchParams.get('fail') === 'true' || searchParams.get('mockFail') === 'true',
-  );
-
   // State quản lý trạng thái gọi API
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -128,14 +123,8 @@ function CheckoutContent(): React.JSX.Element {
 
       // 2. Gọi POST /payments kèm Idempotency Key
       const idempotencyKey = crypto.randomUUID();
-      const mockSuccess = !forceFail;
-      let paymentSucceeded = mockSuccess;
+      let paymentSucceeded = true;
       let serverErrorMessage: string | null = null;
-
-      if (forceFail) {
-        // Tắt cờ lỗi để lần bấm "Thử thanh toán lại" tiếp theo sẽ thành công
-        setForceFail(false);
-      }
 
       try {
         const response = await fetch(`${apiUrl}/payments`, {
@@ -148,7 +137,7 @@ function CheckoutContent(): React.JSX.Element {
             orderId: returnedOrderId,
             method: method,
             idempotencyKey: idempotencyKey,
-            mockSuccess: mockSuccess,
+            mockSuccess: true,
           }),
         });
 
@@ -168,7 +157,7 @@ function CheckoutContent(): React.JSX.Element {
           }
         }
       } catch {
-        paymentSucceeded = mockSuccess;
+        paymentSucceeded = true;
       }
 
       // 3. Đồng bộ trạng thái đơn hàng sang OrdersService (PAID hoặc PAYMENT_FAILED) để hiển thị trong GET /orders/me
@@ -273,18 +262,7 @@ function CheckoutContent(): React.JSX.Element {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1
-            className="text-xl font-bold text-center text-slate-800 select-none cursor-pointer"
-            onDoubleClick={() => setForceFail((prev) => !prev)}
-            title={
-              forceFail
-                ? 'Chế độ giả lập lỗi đang BẬT (Double-click để tắt)'
-                : 'Double-click để bật chế độ giả lập lỗi'
-            }
-          >
-            Thanh toán
-            {forceFail && <span className="ml-1 text-xs text-rose-500 font-normal">(Test lỗi)</span>}
-          </h1>
+          <h1 className="text-xl font-bold text-center text-slate-800">Thanh toán</h1>
           <div className="w-8" />
         </div>
 
