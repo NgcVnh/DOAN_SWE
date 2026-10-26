@@ -7,7 +7,10 @@ export class Order {
   items: OrderItem[];
   userId: string;
   status: OrderStatus;
+  subtotal?: number;
+  discountAmount?: number;
   totalAmount: number;
+  pointsEarned?: number;
   promoCode?: string;
   pointsToUse?: number;
   createdAt: Date;
