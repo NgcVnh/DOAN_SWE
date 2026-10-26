@@ -4,6 +4,7 @@ import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertTransition } from './order-state-machine.js';
 
 // Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -197,12 +198,7 @@ export class OrdersService {
 
   async transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Promise<Order> {
     const order = await this.findByCode(orderCode);
-    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowedNext.includes(nextStatus)) {
-      throw new BadRequestException(
-        `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
-      );
-    }
+    assertTransition(order.status, nextStatus);
     const orderId = Number(order.id);
     if (Number.isInteger(orderId) && orderId > 0) {
       const updatedOrder = await this.prisma.order.update({

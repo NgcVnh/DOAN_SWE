@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { OrderStatus } from './enums/order-status.enum.js';
 
 const allowedTransitions: Record<
@@ -38,5 +39,20 @@ export function canTransition(
   currentStatus: OrderStatus,
   nextStatus: OrderStatus,
 ): boolean {
-  return allowedTransitions[currentStatus].includes(nextStatus);
+  return allowedTransitions[currentStatus]?.includes(nextStatus) ?? false;
+}
+
+/**
+ * [Task 10.1 - Order State Machine]
+ * Chặn mọi chuyển trạng thái không hợp lệ theo sơ đồ nghiệp vụ và ném lỗi BadRequestException
+ */
+export function assertTransition(
+  currentStatus: OrderStatus,
+  nextStatus: OrderStatus,
+): void {
+  if (!canTransition(currentStatus, nextStatus)) {
+    throw new BadRequestException(
+      `Không thể chuyển trạng thái đơn hàng từ "${currentStatus}" sang "${nextStatus}". Chuyển tiếp không hợp lệ!`,
+    );
+  }
 }
