@@ -16,11 +16,13 @@ import {
   RotateCcw,
   CreditCard,
   Tag,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
 import { Header } from '../../components/Header';
 import { useCartStore } from '../../store/useCartStore';
 import { COFFEE_TOPPINGS } from '../../data/coffeeProducts';
-import { getAuthToken } from '../../lib/auth';
+import { getAuthToken, clearAuthData } from '../../lib/auth';
 import {
   OrderView,
   OrderStatusType,
@@ -70,6 +72,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthenticated, setIsUnauthenticated] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<FilterTabId>('ALL');
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -78,15 +81,29 @@ export default function OrderHistoryPage(): React.JSX.Element {
   const fetchMyOrders = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
+    setIsUnauthenticated(false);
+
+    const token = getAuthToken();
+    if (!token) {
+      setIsUnauthenticated(true);
+      setLoading(false);
+      return;
+    }
 
     try {
-      const token = getAuthToken();
       const response = await fetch(`${apiUrl}/orders/me`, {
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         cache: 'no-store',
       });
+
+      if (response.status === 401) {
+        clearAuthData();
+        setIsUnauthenticated(true);
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Máy chủ phản hồi mã lỗi HTTP ${response.status}`);
@@ -203,7 +220,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
         </div>
 
         {/* Thẻ tóm tắt thống kê (Summary Cards) */}
-        {!loading && !error && orders.length > 0 && (
+        {!loading && !error && !isUnauthenticated && orders.length > 0 && (
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-stone-200/80 shadow-xs">
               <p className="text-[11px] sm:text-xs font-medium text-stone-500">Tổng đơn đã đặt</p>
@@ -310,7 +327,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
         )}
 
         {/* 3. Trạng thái Trống (Empty state) */}
-        {!loading && !error && filteredOrders.length === 0 && (
+        {!loading && !error && !isUnauthenticated && filteredOrders.length === 0 && (
           <div className="mx-auto max-w-md rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center shadow-xs my-6">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-4">
               <ShoppingBag className="w-8 h-8" />
@@ -346,7 +363,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
         )}
 
         {/* 4. Danh sách đơn hàng (Order List) */}
-        {!loading && !error && filteredOrders.length > 0 && (
+        {!loading && !error && !isUnauthenticated && filteredOrders.length > 0 && (
           <div className="space-y-4">
             {filteredOrders.map((order) => {
               const meta = ORDER_STATUS_META[order.status];
