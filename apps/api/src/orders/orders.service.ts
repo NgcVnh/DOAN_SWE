@@ -1,145 +1,213 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { randomUUID } from 'crypto';
+import { canTransition } from './order-state-machine.js';
 
-// Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
-const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.PENDING]: [
-    OrderStatus.PAID,
-    OrderStatus.PAYMENT_FAILED,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAYMENT_FAILED]: [
-    OrderStatus.PAID,
-    OrderStatus.PENDING,
-    OrderStatus.CANCELLED,
-  ],
-  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  [OrderStatus.PREPARING]: [OrderStatus.READY],
-  [OrderStatus.READY]: [OrderStatus.COMPLETED],
-  [OrderStatus.COMPLETED]: [],
-  [OrderStatus.CANCELLED]: [],
-};
+/**
+ * Lớp Mutex xử lý kiểm soát đồng thời (Concurrency Control / Race-Condition Prevention)
+ * Đảm bảo các giao dịch đặt hàng đồng thời được tuần tự hóa, tránh Lost Update và Dirty Read.
+ */
+class AsyncMutex {
+  private queue = Promise.resolve();
+
+  async runExclusive<T>(fn: () => Promise<T> | T): Promise<T> {
+    let release: () => void;
+    const ticket = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const previous = this.queue;
+    this.queue = ticket;
+
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release!();
+    }
+  }
+}
 
 @Injectable()
 export class OrdersService {
-  private readonly orders: Order[] = [
-    {
-      id: 'ord-sample-1042',
-      orderCode: 'ORD-1042',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '3',
-          quantity: 1,
-          size: DrinkSize.M,
-          toppings: ['Kem Cheese'],
-          unitPrice: 63000,
-        },
-        {
-          productId: '4',
-          quantity: 2,
-          size: DrinkSize.L,
-          toppings: ['Thạch nha đam'],
-          unitPrice: 57000,
-        },
-      ],
-      status: OrderStatus.PAID,
-      totalAmount: 177000,
-      promoCode: 'BREWLITE10',
-      pointsToUse: 0,
-      createdAt: new Date(Date.now() - 1000 * 60 * 15), // 15 phút trước
-      updatedAt: new Date(Date.now() - 1000 * 60 * 14),
-    },
-    {
-      id: 'ord-sample-1039',
-      orderCode: 'ORD-1039',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '1',
-          quantity: 2,
-          size: DrinkSize.M,
-          toppings: [],
-          unitPrice: 41000,
-        },
-      ],
-      status: OrderStatus.PREPARING,
-      totalAmount: 82000,
-      createdAt: new Date(Date.now() - 1000 * 60 * 45), // 45 phút trước
-      updatedAt: new Date(Date.now() - 1000 * 60 * 30),
-    },
-    {
-      id: 'ord-sample-1028',
-      orderCode: 'ORD-1028',
-      userId: 'user-default-id',
-      items: [
-        {
-          productId: '5',
-          quantity: 1,
-          size: DrinkSize.L,
-          toppings: ['Trân châu đen', 'Kem Cheese'],
-          unitPrice: 74000,
-        },
-      ],
-      status: OrderStatus.COMPLETED,
-      totalAmount: 74000,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24), // Hôm qua
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 23),
-    },
-  ];
+  private readonly orders: Order[] = [];
+  private readonly mutex = new AsyncMutex();
 
-  createOrder(
-    createOrderDto: CreateOrderDto,
-    userId: string = 'user-default-id',
-  ): Order {
-    const timestamp = Date.now();
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const orderCode = `ORD-${timestamp}-${randomSuffix}`;
-
-    // Tính tổng tiền ước tính cho đơn hàng (Base: 35.000đ, Size M +5k, L +10k, mỗi topping +5k)
-    const totalAmount = createOrderDto.items.reduce((sum, item) => {
-      let itemPrice = 35000;
-      if (item.size === DrinkSize.M) itemPrice += 5000;
-      if (item.size === DrinkSize.L) itemPrice += 10000;
-      if (item.toppings && item.toppings.length > 0) {
-        itemPrice += item.toppings.length * 5000;
-      }
-      return sum + itemPrice * item.quantity;
-    }, 0);
-
-    const newOrder: Order = {
-      id:
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : randomUUID(),
-      orderCode,
-      userId,
-      items: createOrderDto.items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        size: item.size,
-        toppings: item.toppings || [],
-      })),
-      status: OrderStatus.PENDING,
-      totalAmount,
-      promoCode: createOrderDto.promoCode,
-      pointsToUse: createOrderDto.pointsToUse,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    this.orders.push(newOrder);
-
-    return newOrder;
+  constructor() {
+    if (process.env.NODE_ENV !== 'test') {
+      this.seedInitialOrders();
+    }
   }
 
-  findByUserId(userId: string, status?: OrderStatus): Order[] {
+  private seedInitialOrders() {
+    const demoOrders: Order[] = [
+      {
+        id: 'demo-ord-1',
+        orderCode: 'ORD-20261026-001',
+        userId: '1',
+        items: [
+          { productId: '1', quantity: 2, size: DrinkSize.M, toppings: ['Trân châu'] },
+        ],
+        status: OrderStatus.PREPARING,
+        totalAmount: 85000,
+        createdAt: new Date(Date.now() - 3600000 * 2),
+        updatedAt: new Date(Date.now() - 3600000 * 2),
+      },
+      {
+        id: 'demo-ord-2',
+        orderCode: 'ORD-20261026-002',
+        userId: '1',
+        items: [
+          { productId: '2', quantity: 1, size: DrinkSize.L, toppings: [] },
+        ],
+        status: OrderStatus.COMPLETED,
+        totalAmount: 45000,
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        id: 'demo-ord-3',
+        orderCode: 'ORD-20261026-003',
+        userId: '2',
+        items: [
+          { productId: '3', quantity: 1, size: DrinkSize.M, toppings: ['Thạch phô mai'] },
+        ],
+        status: OrderStatus.READY,
+        totalAmount: 45000,
+        createdAt: new Date(Date.now() - 1800000),
+        updatedAt: new Date(Date.now() - 1800000),
+      },
+      {
+        id: 'demo-ord-4',
+        orderCode: 'ORD-20261026-004',
+        userId: '3',
+        items: [
+          { productId: '1', quantity: 1, size: DrinkSize.S, toppings: [] },
+        ],
+        status: OrderStatus.PAID,
+        totalAmount: 35000,
+        createdAt: new Date(Date.now() - 900000),
+        updatedAt: new Date(Date.now() - 900000),
+      },
+    ];
+
+    this.orders.push(...demoOrders);
+  }
+
+  // =========================================================================
+  // TASK 10.2: QUẢN LÝ TỒN KHO & KIỂM SOÁT ĐỒNG THỜI (CONCURRENCY CONTROL)
+  // Bảng theo dõi số lượng tồn kho của từng sản phẩm trong kho
+  // =========================================================================
+  private readonly productStocks: Map<string, number> = new Map([
+    ['1', 50],
+    ['2', 50],
+    ['3', 30],
+    ['4', 40],
+    ['prod-1', 50],
+    ['prod-2', 50],
+    ['prod-tra-sua-olong', 25],
+    ['prod-cafe', 30],
+    ['prod-limited', 2], // Sản phẩm số lượng có hạn để kiểm thử race-condition chống bán vượt
+  ]);
+
+  /**
+   * Tạo đơn hàng mới với Transaction kiểm soát tồn kho đồng thời an toàn:
+   * 1. Kiểm tra tồn kho toàn bộ giỏ hàng (Validation Phase).
+   * 2. Trừ tồn kho đồng thời an toàn, ngăn chặn bán vượt tồn kho (Overselling Prevention).
+   * 3. Tạo đơn hàng và lưu trữ nhất quán (Consistent Transaction).
+   * 4. Tự động Rollback hoàn trả kho nếu xảy ra lỗi bất ngờ.
+   */
+  async createOrder(
+    createOrderDto: CreateOrderDto,
+    userId: string | number = '0',
+  ): Promise<Order> {
+    return this.mutex.runExclusive(async () => {
+      // -------------------------------------------------------------
+      // BƯỚC 1: KIỂM TRA TỒN KHO TOÀN BỘ SẢN PHẨM (Validation Phase)
+      // Chống bán vượt tồn kho (Overselling Prevention)
+      // -------------------------------------------------------------
+      for (const item of createOrderDto.items) {
+        const availableStock = this.getProductStock(item.productId);
+        if (availableStock < item.quantity) {
+          throw new BadRequestException(
+            `Sản phẩm ID "${item.productId}" không đủ tồn kho (Còn lại: ${availableStock}, yêu cầu: ${item.quantity}). Vui lòng giảm số lượng!`,
+          );
+        }
+      }
+
+      // -------------------------------------------------------------
+      // BƯỚC 2: TRANSACTION NGUYÊN TỬ (Atomic Deduction & Order Creation)
+      // Đảm bảo tạo đơn và trừ kho hoàn toàn nhất quán.
+      // -------------------------------------------------------------
+      const deductedItems: Array<{ productId: string; qty: number }> = [];
+
+      try {
+        // Trừ tồn kho từng sản phẩm
+        for (const item of createOrderDto.items) {
+          const currentStock = this.getProductStock(item.productId);
+          this.setProductStock(item.productId, currentStock - item.quantity);
+          deductedItems.push({ productId: item.productId, qty: item.quantity });
+        }
+
+        const timestamp = Date.now();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        const orderCode = `ORD-${timestamp}-${randomSuffix}`;
+
+        // Tính tổng tiền ước tính cho đơn hàng (Base: 35.000đ, Size M +5k, L +10k, mỗi topping +5k)
+        const totalAmount = createOrderDto.items.reduce((sum, item) => {
+          let itemPrice = 35000;
+          if (item.size === DrinkSize.M) itemPrice += 5000;
+          if (item.size === DrinkSize.L) itemPrice += 10000;
+          if (item.toppings && item.toppings.length > 0) {
+            itemPrice += item.toppings.length * 5000;
+          }
+          return sum + itemPrice * item.quantity;
+        }, 0);
+
+        const newOrder: Order = {
+          id:
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : randomUUID(),
+          orderCode,
+          userId: String(userId),
+          items: createOrderDto.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            size: item.size,
+            toppings: item.toppings || [],
+          })),
+          status: OrderStatus.PENDING,
+          totalAmount,
+          promoCode: createOrderDto.promoCode,
+          pointsToUse: createOrderDto.pointsToUse,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        this.orders.push(newOrder);
+        return newOrder;
+      } catch (error) {
+        // ROLLBACK: Hoàn tác lại toàn bộ số lượng kho đã trừ nếu xảy ra lỗi
+        for (const d of deductedItems) {
+          const cur = this.getProductStock(d.productId);
+          this.setProductStock(d.productId, cur + d.qty);
+        }
+        throw error;
+      }
+    });
+  }
+
+  findByUserId(userId: string | number, status?: OrderStatus): Order[] {
+    const targetUserId = String(userId);
     return this.orders
       .filter((order) => {
-        const matchUser = order.userId === userId;
+        const matchUser = order.userId === targetUserId;
         const matchStatus = status ? order.status === status : true;
         return matchUser && matchStatus;
       })
@@ -151,7 +219,9 @@ export class OrdersService {
       (o) => o.orderCode === orderCode || o.id === orderCode,
     );
     if (!order) {
-      throw new NotFoundException(`Không tìm thấy đơn hàng với mã: ${orderCode}`);
+      throw new NotFoundException(
+        `Không tìm thấy đơn hàng với mã: ${orderCode}`,
+      );
     }
     return order;
   }
@@ -162,18 +232,59 @@ export class OrdersService {
     );
   }
 
+  /**
+   * Chuyển trạng thái đơn hàng theo sơ đồ Order State Machine
+   * Tự động hoàn trả tồn kho (Restoration of Stock) khi đơn hàng bị hủy (CANCELLED).
+   */
   transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Order {
     const order = this.findByCode(orderCode);
-    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowedNext.includes(nextStatus)) {
+
+    if (!canTransition(order.status, nextStatus)) {
       throw new BadRequestException(
         `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
       );
     }
+
+    // Tự động hoàn trả lại tồn kho vào kho hàng nếu đơn bị hủy
+    if (nextStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+      for (const item of order.items) {
+        const cur = this.getProductStock(item.productId);
+        this.setProductStock(item.productId, cur + item.quantity);
+      }
+    }
+
     order.status = nextStatus;
     order.updatedAt = new Date();
+
     return order;
   }
+
+  // =========================================================================
+  // HELPER METHODS: QUẢN LÝ TỒN KHO PHỤC VỤ DEBUG & KIỂM THỬ (TESTING)
+  // =========================================================================
+
+  /**
+   * Lấy số lượng tồn kho hiện tại của một sản phẩm
+   */
+  getProductStock(productId: string): number {
+    return this.productStocks.get(productId) ?? 50; // Mặc định 50 nếu chưa cấu hình
+  }
+
+  /**
+   * Cập nhật số lượng tồn kho (Hữu ích khi setup kịch bản kiểm thử)
+   */
+  setProductStock(productId: string, stock: number): void {
+    this.productStocks.set(productId, Math.max(0, stock));
+  }
+
+  /**
+   * Lấy toàn bộ trạng thái tồn kho của hệ thống để debug
+   */
+  getAllStocks(): Record<string, number> {
+    const stocks: Record<string, number> = {};
+    for (const [key, val] of this.productStocks.entries()) {
+      stocks[key] = val;
+    }
+    return stocks;
+  }
 }
-
-

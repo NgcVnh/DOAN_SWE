@@ -12,10 +12,10 @@ import {
   RefreshCw,
   CreditCard,
   RotateCcw,
-  Sparkles,
   Receipt,
   Coffee,
   Tag,
+  Ban,
 } from 'lucide-react';
 import { Header } from '../../../components/Header';
 import { useCartStore } from '../../../store/useCartStore';
@@ -77,8 +77,11 @@ export default function OrderDetailPage(): React.JSX.Element {
     void fetchOrderDetail();
   }, [fetchOrderDetail]);
 
-  const handleTransitionStatus = async (nextStatus: OrderStatusType): Promise<void> => {
+  const handleCancelOrder = async (): Promise<void> => {
     if (!order) return;
+    const confirmed = window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?');
+    if (!confirmed) return;
+
     setUpdating(true);
     setActionError(null);
 
@@ -88,7 +91,7 @@ export default function OrderDetailPage(): React.JSX.Element {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: nextStatus }),
+          body: JSON.stringify({ status: 'CANCELLED' as OrderStatusType }),
         },
       );
 
@@ -100,7 +103,7 @@ export default function OrderDetailPage(): React.JSX.Element {
           'message' in data &&
           typeof (data as { message: unknown }).message === 'string'
             ? (data as { message: string }).message
-            : 'Chuyển trạng thái không hợp lệ';
+            : 'Hủy đơn hàng không thành công';
         throw new Error(errMsg);
       }
 
@@ -109,7 +112,7 @@ export default function OrderDetailPage(): React.JSX.Element {
         setOrder(updated);
       }
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Lỗi cập nhật trạng thái');
+      setActionError(err instanceof Error ? err.message : 'Lỗi hủy đơn hàng');
     } finally {
       setUpdating(false);
     }
@@ -223,7 +226,7 @@ export default function OrderDetailPage(): React.JSX.Element {
               {meta.stepIndex >= 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-stone-700">
-                    Tiến độ đơn hàng (Order State Machine):
+                    Tiến độ đơn hàng:
                   </p>
                   <div className="space-y-2.5">
                     {MAIN_FLOW_STEPS.map((step, idx) => {
@@ -260,10 +263,7 @@ export default function OrderDetailPage(): React.JSX.Element {
                                     : 'text-stone-500'
                               }`}
                             >
-                              {step.label}{' '}
-                              <span className="font-mono text-[11px] opacity-75">
-                                ({step.status})
-                              </span>
+                              {step.label}
                             </p>
                           </div>
                           {isCurrent && (
@@ -296,38 +296,16 @@ export default function OrderDetailPage(): React.JSX.Element {
                 </div>
               )}
 
-              {/* Hộp điều khiển chuyển trạng thái phục vụ vấn đáp / Demo */}
-              {(meta.nextDemoStatus || meta.canCancel) && (
-                <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 space-y-2.5">
-                  <p className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                    Bảng điều khiển Barista / Demo State Machine:
-                  </p>
-                  {actionError && (
-                    <p className="text-xs text-rose-600 font-medium">{actionError}</p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {meta.nextDemoStatus && (
-                      <button
-                        type="button"
-                        disabled={updating}
-                        onClick={() => void handleTransitionStatus(meta.nextDemoStatus!)}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold transition"
-                      >
-                        {updating ? 'Đang cập nhật...' : `Chuyển sang: ${meta.nextDemoLabel}`}
-                      </button>
-                    )}
-                    {meta.canCancel && (
-                      <button
-                        type="button"
-                        disabled={updating}
-                        onClick={() => void handleTransitionStatus('CANCELLED')}
-                        className="px-3.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 disabled:opacity-50 text-rose-700 text-xs font-semibold transition"
-                      >
-                        Hủy đơn hàng (CANCELLED)
-                      </button>
-                    )}
-                  </div>
+              {actionError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center justify-between">
+                  <span>{actionError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setActionError(null)}
+                    className="font-bold hover:underline"
+                  >
+                    Đóng
+                  </button>
                 </div>
               )}
             </section>
@@ -431,6 +409,18 @@ export default function OrderDetailPage(): React.JSX.Element {
                 <RotateCcw className="w-4 h-4" />
                 <span>Đặt lại đơn này</span>
               </button>
+
+              {meta.canCancel && (
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={() => void handleCancelOrder()}
+                  className="inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 text-sm font-semibold transition border border-rose-200"
+                >
+                  <Ban className="w-4 h-4" />
+                  <span>{updating ? 'Đang hủy...' : 'Hủy đơn'}</span>
+                </button>
+              )}
             </div>
           </>
         )}
@@ -438,4 +428,3 @@ export default function OrderDetailPage(): React.JSX.Element {
     </div>
   );
 }
-

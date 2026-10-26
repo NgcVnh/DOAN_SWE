@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ClipboardList, ArrowLeft } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
+import { getAuthToken } from '@/lib/auth';
 
 type PaymentMethodType = 'WALLET' | 'CARD';
 
@@ -84,9 +85,13 @@ function CheckoutContent(): React.JSX.Element {
               ];
 
         try {
+          const token = getAuthToken();
           const createOrderRes = await fetch(`${apiUrl}/orders`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({ items: orderPayloadItems }),
           });
 

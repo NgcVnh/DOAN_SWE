@@ -3,14 +3,24 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
+import { JwtAuthGuard } from './../src/auth/guards/jwt-auth.guard.js';
 
-describe('OrdersController (e2e)', () => {
+describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: any) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = { id: 'test-user-1' };
+          return true;
+        },
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -54,6 +64,25 @@ describe('OrdersController (e2e)', () => {
     expect(res.body.totalAmount).toBeGreaterThan(0);
 
     createdOrderCode = res.body.orderCode;
+  });
+
+  it('POST /orders - should fail with 400 when product is out of stock (Chống bán vượt tồn kho)', async () => {
+    const payload = {
+      items: [
+        {
+          productId: 'prod-limited',
+          quantity: 999, // Vượt quá tồn kho
+          size: 'M',
+        },
+      ],
+    };
+
+    const res = await request(app.getHttpServer())
+      .post('/orders')
+      .send(payload)
+      .expect(400);
+
+    expect(res.body.message).toContain('không đủ tồn kho');
   });
 
   it('POST /orders - should fail validation with 400 when items are empty', async () => {
@@ -107,4 +136,3 @@ describe('OrdersController (e2e)', () => {
     expect(res.body.status).toBe('PAID');
   });
 });
-

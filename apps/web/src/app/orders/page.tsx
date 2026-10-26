@@ -8,7 +8,6 @@ import {
   RefreshCw,
   AlertCircle,
   ShoppingBag,
-  Search,
   Clock,
   CheckCircle2,
   XCircle,
@@ -16,12 +15,14 @@ import {
   ChevronRight,
   RotateCcw,
   CreditCard,
-  Sparkles,
   Tag,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
 import { Header } from '../../components/Header';
 import { useCartStore } from '../../store/useCartStore';
 import { COFFEE_TOPPINGS } from '../../data/coffeeProducts';
+import { getAuthToken, clearAuthData } from '../../lib/auth';
 import {
   OrderView,
   OrderStatusType,
@@ -71,11 +72,8 @@ export default function OrderHistoryPage(): React.JSX.Element {
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthenticated, setIsUnauthenticated] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<FilterTabId>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [demoMode, setDemoMode] = useState<boolean>(false);
-  const [updatingCode, setUpdatingCode] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -83,12 +81,29 @@ export default function OrderHistoryPage(): React.JSX.Element {
   const fetchMyOrders = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
-    setActionError(null);
+    setIsUnauthenticated(false);
+
+    const token = getAuthToken();
+    if (!token) {
+      setIsUnauthenticated(true);
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${apiUrl}/orders/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         cache: 'no-store',
       });
+
+      if (response.status === 401) {
+        clearAuthData();
+        setIsUnauthenticated(true);
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Máy chủ phản hồi mã lỗi HTTP ${response.status}`);
@@ -128,51 +143,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     void fetchMyOrders();
   }, [fetchMyOrders]);
 
-  // Chuyển trạng thái đơn hàng (Phục vụ Demo Order State Machine & Hủy đơn)
-  const handleTransitionStatus = async (
-    orderCode: string,
-    nextStatus: OrderStatusType,
-  ): Promise<void> => {
-    setUpdatingCode(orderCode);
-    setActionError(null);
-
-    try {
-      const response = await fetch(`${apiUrl}/orders/${encodeURIComponent(orderCode)}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-
-      const data: unknown = await response.json();
-      if (!response.ok) {
-        const errMsg =
-          typeof data === 'object' &&
-          data !== null &&
-          'message' in data &&
-          typeof (data as { message: unknown }).message === 'string'
-            ? (data as { message: string }).message
-            : 'Chuyển trạng thái không hợp lệ';
-        throw new Error(errMsg);
-      }
-
-      const updatedOrder = normalizeOrderRecord(data);
-      if (updatedOrder) {
-        setOrders((prev) =>
-          prev.map((o) => (o.orderCode === orderCode ? updatedOrder : o)),
-        );
-      } else {
-        await fetchMyOrders();
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi cập nhật trạng thái đơn hàng';
-      setActionError(msg);
-    } finally {
-      setUpdatingCode(null);
-    }
-  };
-
   // Đặt lại các món trong đơn cũ vào giỏ hàng
   const handleReorder = (order: OrderView): void => {
     for (const item of order.items) {
@@ -197,23 +167,14 @@ export default function OrderHistoryPage(): React.JSX.Element {
     router.push('/cart');
   };
 
-  // Lọc danh sách đơn theo Tab và từ khóa tìm kiếm
+  // Lọc danh sách đơn theo Tab trạng thái
   const filteredOrders = useMemo<OrderView[]>(() => {
     const currentTab = FILTER_TABS.find((t) => t.id === activeTab);
-    const query = searchQuery.trim().toLowerCase();
-
-    return orders.filter((order) => {
-      const matchTab =
-        !currentTab?.statuses || currentTab.statuses.includes(order.status);
-
-      const matchQuery =
-        query.length === 0 ||
-        order.orderCode.toLowerCase().includes(query) ||
-        order.items.some((i) => i.productName.toLowerCase().includes(query));
-
-      return matchTab && matchQuery;
-    });
-  }, [orders, activeTab, searchQuery]);
+    if (!currentTab?.statuses) {
+      return orders;
+    }
+    return orders.filter((order) => currentTab.statuses!.includes(order.status));
+  }, [orders, activeTab]);
 
   // Thống kê nhanh
   const stats = useMemo(() => {
@@ -233,7 +194,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
       <Header />
 
       <main className="max-w-md mx-auto md:max-w-4xl lg:max-w-5xl px-4 py-6 sm:py-8 flex-1 w-full space-y-6">
-        {/* Tiêu đề trang & Các nút điều khiển */}
+        {/* Tiêu đề trang & Nút tải lại */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-amber-950 flex items-center gap-2.5">
@@ -241,25 +202,11 @@ export default function OrderHistoryPage(): React.JSX.Element {
               <span>Lịch sử đơn hàng</span>
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              Theo dõi tiến độ pha chế & tra cứu lịch sử đặt nước (API: <code className="text-amber-800 font-mono">GET /orders/me</code>)
+              Theo dõi tiến độ pha chế & tra cứu lịch sử đặt đồ uống tại BrewLite
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setDemoMode((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition shadow-xs ${
-                demoMode
-                  ? 'bg-amber-100 border-amber-300 text-amber-900'
-                  : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-              }`}
-              title="Bật chế độ mô phỏng chuyển trạng thái đơn hàng cho buổi bảo vệ đồ án"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>{demoMode ? 'Đang bật Demo Barista' : 'Chế độ Demo'}</span>
-            </button>
-
             <button
               type="button"
               onClick={() => void fetchMyOrders()}
@@ -273,7 +220,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
         </div>
 
         {/* Thẻ tóm tắt thống kê (Summary Cards) */}
-        {!loading && !error && orders.length > 0 && (
+        {!loading && !error && !isUnauthenticated && orders.length > 0 && (
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-stone-200/80 shadow-xs">
               <p className="text-[11px] sm:text-xs font-medium text-stone-500">Tổng đơn đã đặt</p>
@@ -298,21 +245,8 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
-        {/* Thanh tìm kiếm & Bộ lọc trạng thái */}
-        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs space-y-3">
-          {/* Ô tìm kiếm */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã đơn (VD: ORD-1042) hoặc tên món..."
-              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500 focus:bg-white transition"
-            />
-          </div>
-
-          {/* Các Tab lọc trạng thái */}
+        {/* Bộ lọc trạng thái đơn hàng */}
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {FILTER_TABS.map((tab) => {
               const isActive = activeTab === tab.id;
@@ -346,23 +280,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Thông báo lỗi khi thao tác cập nhật trạng thái */}
-        {actionError && (
-          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-rose-800">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{actionError}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActionError(null)}
-              className="text-rose-600 font-bold hover:underline"
-            >
-              Đóng
-            </button>
-          </div>
-        )}
-
         {/* 1. Trạng thái Loading (Skeleton) */}
         {loading && (
           <div className="space-y-4">
@@ -389,6 +306,35 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
+        {/* 1.5. Trạng thái Chưa đăng nhập / Phiên hết hạn */}
+        {!loading && isUnauthenticated && (
+          <div className="mx-auto max-w-md rounded-2xl border border-stone-200/90 bg-white p-8 text-center shadow-xs my-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-4">
+              <LogIn className="w-8 h-8" />
+            </div>
+            <h3 className="text-base font-bold text-stone-900">Vui lòng đăng nhập</h3>
+            <p className="mt-2 text-xs text-stone-500 leading-relaxed">
+              Bạn chưa đăng nhập hoặc phiên làm việc của bạn đã hết hạn. Vui lòng đăng nhập để xem lịch sử đơn hàng và theo dõi tiến độ pha chế.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Link
+                href="/login?redirect=/orders"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold shadow-xs transition"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Đăng nhập ngay</span>
+              </Link>
+              <Link
+                href="/register?redirect=/orders"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Đăng ký tài khoản</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* 2. Trạng thái Lỗi (Error state) */}
         {!loading && error && (
           <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
@@ -410,7 +356,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
         )}
 
         {/* 3. Trạng thái Trống (Empty state) */}
-        {!loading && !error && filteredOrders.length === 0 && (
+        {!loading && !error && !isUnauthenticated && filteredOrders.length === 0 && (
           <div className="mx-auto max-w-md rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center shadow-xs my-6">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-4">
               <ShoppingBag className="w-8 h-8" />
@@ -418,24 +364,21 @@ export default function OrderHistoryPage(): React.JSX.Element {
             <h3 className="text-base font-bold text-stone-800">
               {orders.length === 0
                 ? 'Bạn chưa có đơn hàng nào'
-                : 'Không tìm thấy đơn hàng phù hợp'}
+                : 'Không có đơn hàng trong mục này'}
             </h3>
             <p className="mt-1.5 text-xs text-stone-500 leading-relaxed">
               {orders.length === 0
                 ? 'Hãy chọn món đồ uống yêu thích từ thực đơn BrewLite và trải nghiệm thanh toán một chạm không tiền mặt nhé!'
-                : 'Thử thay đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm để xem các đơn hàng khác.'}
+                : 'Hiện tại bạn không có đơn hàng nào ở trạng thái này.'}
             </p>
             <div className="mt-5 flex items-center justify-center gap-3">
-              {orders.length > 0 && (
+              {orders.length > 0 && activeTab !== 'ALL' && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveTab('ALL');
-                    setSearchQuery('');
-                  }}
+                  onClick={() => setActiveTab('ALL')}
                   className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition"
                 >
-                  Xóa bộ lọc
+                  Xem tất cả đơn
                 </button>
               )}
               <Link
@@ -449,11 +392,10 @@ export default function OrderHistoryPage(): React.JSX.Element {
         )}
 
         {/* 4. Danh sách đơn hàng (Order List) */}
-        {!loading && !error && filteredOrders.length > 0 && (
+        {!loading && !error && !isUnauthenticated && filteredOrders.length > 0 && (
           <div className="space-y-4">
             {filteredOrders.map((order) => {
               const meta = ORDER_STATUS_META[order.status];
-              const isUpdating = updatingCode === order.orderCode;
 
               return (
                 <article
@@ -575,42 +517,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                     ))}
                   </div>
 
-                  {/* Thanh điều khiển Demo State Machine (Chỉ hiện khi bật Chế độ Demo) */}
-                  {demoMode && (meta.nextDemoStatus || meta.canCancel) && (
-                    <div className="mx-4 sm:mx-5 mb-3 p-3 rounded-xl bg-amber-50/80 border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                        Mô phỏng Order State Machine (PATCH /orders/:code/status):
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {meta.nextDemoStatus && (
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              void handleTransitionStatus(order.orderCode, meta.nextDemoStatus!)
-                            }
-                            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-semibold transition"
-                          >
-                            {isUpdating ? 'Đang chuyển...' : `➔ ${meta.nextDemoLabel}`}
-                          </button>
-                        )}
-                        {meta.canCancel && (
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              void handleTransitionStatus(order.orderCode, 'CANCELLED')
-                            }
-                            className="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 disabled:opacity-50 text-rose-700 font-semibold transition"
-                          >
-                            Hủy đơn (CANCELLED)
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Phần chân Card: Tổng tiền & Các nút hành động */}
                   <div className="px-4 sm:px-5 py-3.5 bg-stone-50/50 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -653,7 +559,7 @@ export default function OrderHistoryPage(): React.JSX.Element {
                         <span>Đặt lại</span>
                       </button>
 
-                      {/* Nút Xem chi tiết đơn (FR5) */}
+                      {/* Nút Xem chi tiết đơn */}
                       <Link
                         href={`/orders/${encodeURIComponent(order.orderCode)}`}
                         className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"
@@ -676,4 +582,3 @@ export default function OrderHistoryPage(): React.JSX.Element {
     </div>
   );
 }
-
