@@ -306,6 +306,35 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
+        {/* 1.5. Trạng thái Chưa đăng nhập / Phiên hết hạn */}
+        {!loading && isUnauthenticated && (
+          <div className="mx-auto max-w-md rounded-2xl border border-stone-200/90 bg-white p-8 text-center shadow-xs my-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-4">
+              <LogIn className="w-8 h-8" />
+            </div>
+            <h3 className="text-base font-bold text-stone-900">Vui lòng đăng nhập</h3>
+            <p className="mt-2 text-xs text-stone-500 leading-relaxed">
+              Bạn chưa đăng nhập hoặc phiên làm việc của bạn đã hết hạn. Vui lòng đăng nhập để xem lịch sử đơn hàng và theo dõi tiến độ pha chế.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Link
+                href="/login?redirect=/orders"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold shadow-xs transition"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Đăng nhập ngay</span>
+              </Link>
+              <Link
+                href="/register?redirect=/orders"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Đăng ký tài khoản</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* 2. Trạng thái Lỗi (Error state) */}
         {!loading && error && (
           <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">

@@ -15,7 +15,16 @@ export const Header: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    setCurrentUser(getStoredUser());
+    const handleAuthChange = () => {
+      setCurrentUser(getStoredUser());
+    };
+    handleAuthChange();
+    window.addEventListener('auth-change', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
   }, [pathname]);
 
   const handleLogout = () => {

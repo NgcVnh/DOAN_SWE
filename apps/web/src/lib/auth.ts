@@ -13,6 +13,7 @@ export const saveAuthData = (token: string, user: User) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.dispatchEvent(new Event('auth-change'));
   }
 };
 
@@ -40,6 +41,7 @@ export const clearAuthData = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    window.dispatchEvent(new Event('auth-change'));
   }
 };
 
