@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '../components/Header';
 import { Coffee, ArrowRight, RefreshCw, AlertCircle, ShoppingBag } from 'lucide-react';
-import { clearAuthData, getStoredUser, User } from '@/lib/auth';
+import { clearAuthData, getAuthToken, getStoredUser, updateStoredUserPoints, User } from '@/lib/auth';
 
 export interface Product {
   id: number;
@@ -49,10 +49,24 @@ export default function Home() {
     const user = getStoredUser();
     if (user) {
       setCurrentUser(user);
+      const token = getAuthToken();
+      if (token) {
+        fetch(`${apiUrl}/promotions/loyalty/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data && typeof data.points === 'number') {
+              setCurrentUser((prev) => (prev ? { ...prev, loyaltyPoints: data.points } : null));
+              updateStoredUserPoints(data.points);
+            }
+          })
+          .catch(() => {});
+      }
     }
 
     fetchProducts();
-  }, []);
+  }, [apiUrl]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {

@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { PromotionsService } from './promotions.service.js';
@@ -66,15 +67,20 @@ export class PromotionsController {
    */
   @Get('loyalty/me')
   @UseGuards(JwtAuthGuard)
-  async getMyLoyaltySummary(@CurrentUser() user: { userId: number; email: string }) {
+  async getMyLoyaltySummary(@CurrentUser() user: any) {
+    const userId = Number(user?.id ?? user?.userId);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new UnauthorizedException('Người dùng không hợp lệ');
+    }
+
     const dbUser = await this.prisma.user.findUnique({
-      where: { id: Number(user.userId) },
+      where: { id: userId },
       select: { id: true, email: true, fullName: true, loyaltyPoints: true },
     });
 
     const points = dbUser?.loyaltyPoints ?? 0;
     return {
-      userId: user.userId,
+      userId,
       points,
       pointValueInVnd: LOYALTY_CONSTANTS.POINT_VALUE_IN_VND,
       equivalentDiscountVnd: points * LOYALTY_CONSTANTS.POINT_VALUE_IN_VND,

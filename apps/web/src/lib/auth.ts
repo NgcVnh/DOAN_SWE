@@ -43,3 +43,17 @@ export const clearAuthData = () => {
   }
 };
 
+
+export const updateStoredUserPoints = (newPoints: number) => {
+  if (typeof window !== 'undefined') {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return;
+    try {
+      const user = JSON.parse(raw) as User;
+      user.loyaltyPoints = newPoints;
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {
+      // ignore
+    }
+  }
+};

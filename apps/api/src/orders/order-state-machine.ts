@@ -39,6 +39,9 @@ export function canTransition(
   currentStatus: OrderStatus,
   nextStatus: OrderStatus,
 ): boolean {
+  if (currentStatus === nextStatus) {
+    return true;
+  }
   return allowedTransitions[currentStatus]?.includes(nextStatus) ?? false;
 }
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ClipboardList, ArrowLeft, Tag, Award, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import { getAuthToken } from '@/lib/auth';
+import { getAuthToken, updateStoredUserPoints } from '@/lib/auth';
 
 type PaymentMethodType = 'WALLET' | 'CARD';
 
@@ -265,6 +265,20 @@ function CheckoutContent(): React.JSX.Element {
           pointsEarned: expectedPointsEarned,
         });
         clearCart();
+
+        if (token) {
+          fetch(`${apiUrl}/promotions/loyalty/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data && typeof data.points === 'number') {
+                updateStoredUserPoints(data.points);
+                setUserAvailablePoints(data.points);
+              }
+            })
+            .catch(() => {});
+        }
       } else {
         setErrorMessage(
           serverErrorMessage ||

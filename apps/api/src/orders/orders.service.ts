@@ -262,6 +262,10 @@ export class OrdersService {
 
   async transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Promise<Order> {
     const order = await this.findByCode(orderCode);
+    if (order.status === nextStatus) {
+      return order;
+    }
+    
     assertTransition(order.status, nextStatus);
     const orderId = Number(order.id);
     if (Number.isInteger(orderId) && orderId > 0) {
