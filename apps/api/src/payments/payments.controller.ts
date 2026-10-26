@@ -1,10 +1,10 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 
 /**
  * [OOP - Single Responsibility Principle]
- * PaymentsController chỉ chịu trách nhiệm tiếp nhận HTTP Request (POST /payments),
+ * PaymentsController tiếp nhận HTTP Request (/payments),
  * nhận dữ liệu đã được validate qua CreatePaymentDto và chuyển giao cho PaymentsService xử lý.
  */
 @Controller('payments')
@@ -13,8 +13,17 @@ export class PaymentsController {
 
   @Post()
   async createPayment(@Body() dto: CreatePaymentDto) {
-    // TODO: Gọi hàm processPayment(dto) từ this.paymentsService và trả về kết quả
     return this.paymentsService.processPayment(dto);
+  }
+
+  @Get('order/:orderId')
+  async getPaymentsByOrderId(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.paymentsService.getPaymentsByOrderId(orderId);
+  }
+
+  @Get(':id')
+  async getPaymentById(@Param('id', ParseIntPipe) id: number) {
+    return this.paymentsService.getPaymentById(id);
   }
 }
 

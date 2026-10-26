@@ -8,8 +8,9 @@ Thư mục `tests/` chứa các kịch bản kiểm thử tích hợp (Integrati
 
 ```text
 tests/
-├── integration/        # Kiểm thử tích hợp giữa Controller, Service và Repository
-│   └── cart.integration.spec.ts
+├── integration/        # Kiểm thử tích hợp giữa Controller, Service và Database
+│   ├── cart.integration.spec.ts
+│   └── payments-idempotency.integration.spec.ts
 ├── e2e/                # Kiểm thử luồng người dùng hoàn chỉnh (API E2E)
 │   └── cart-flow.e2e.spec.ts
 └── README.md
@@ -19,12 +20,12 @@ tests/
 
 ## 2. Cách chạy kiểm thử
 
-### Kiểm thử Unit & E2E của Backend (`apps/api`):
+### Kiểm thử Unit & Integration Tests của Backend (`apps/api`):
 ```bash
-# Chạy Unit Tests
+# Chạy Unit & Service Integration Tests (với PostgreSQL)
 npm --prefix apps/api run test
 
-# Chạy E2E Tests
+# Chạy E2E HTTP API Tests (với PostgreSQL)
 npm --prefix apps/api run test:e2e
 ```
 
@@ -32,4 +33,3 @@ npm --prefix apps/api run test:e2e
 ```bash
 npm run test
 ```
-

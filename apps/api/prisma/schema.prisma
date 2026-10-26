@@ -136,6 +136,7 @@ model Payment {
   amount         Int
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
+  mockSuccess Boolean @default(true)
   transactionRef String?
   createdAt      DateTime      @default(now())
 

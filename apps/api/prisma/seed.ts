@@ -1,4 +1,5 @@
 import { PrismaClient, DiscountType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -104,17 +105,19 @@ async function main() {
 
   // 4. Seed Demo User (password is '123456')
   const demoEmail = 'customer@brewlite.vn';
-  const existingUser = await prisma.user.findUnique({ where: { email: demoEmail } });
-  if (!existingUser) {
-    await prisma.user.create({
-      data: {
-        email: demoEmail,
-        fullName: 'Khách hàng Thử Nghiệm',
-        passwordHash: '$2b$10$EP0.P2e43mIu8y6Gq8iK1O6e9mG4Vn7pA8u8p6pB8q3oP2r0nK9mC', // hash của 123456
-        loyaltyPoints: 100,
-      },
-    });
-  }
+  const realPasswordHash = await bcrypt.hash('123456', 10);
+  await prisma.user.upsert({
+    where: { email: demoEmail },
+    update: {
+      passwordHash: realPasswordHash,
+    },
+    create: {
+      email: demoEmail,
+      fullName: 'Khách hàng Thử Nghiệm',
+      passwordHash: realPasswordHash,
+      loyaltyPoints: 100,
+    },
+  });
 
   // 5. Seed Demo Order (Pending) for Checkout test
   const existingOrder = await prisma.order.findUnique({ where: { id: 1 } });
@@ -134,6 +137,11 @@ async function main() {
       });
     }
   }
+
+  // 6. Đồng bộ sequence ID trong PostgreSQL sau khi chèn dữ liệu mẫu
+  await prisma.$executeRawUnsafe(
+    `SELECT setval(pg_get_serial_sequence('orders', 'id'), COALESCE((SELECT MAX(id) FROM orders), 1));`
+  );
 
   console.log('Seeding completed successfully!');
 }

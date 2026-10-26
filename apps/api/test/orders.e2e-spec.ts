@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module.js';
 
 describe('OrdersController (e2e)', () => {
   let app: INestApplication<App>;
+  let authToken: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -21,6 +22,15 @@ describe('OrdersController (e2e)', () => {
       }),
     );
     await app.init();
+
+    // Authenticate with seeded user
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'customer@brewlite.vn', password: '123456' });
+
+    if (loginRes.body?.accessToken) {
+      authToken = loginRes.body.accessToken;
+    }
   });
 
   afterAll(async () => {
@@ -42,8 +52,12 @@ describe('OrdersController (e2e)', () => {
       promoCode: 'GIAM10K',
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(201);
 
@@ -61,8 +75,12 @@ describe('OrdersController (e2e)', () => {
       items: [],
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(400);
 
@@ -80,8 +98,12 @@ describe('OrdersController (e2e)', () => {
       ],
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(400);
 
