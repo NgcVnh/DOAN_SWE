@@ -1,166 +1,190 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { OrderStatus as PrismaOrderStatus, ProductSize } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
-import { randomUUID } from 'crypto';
-import { canTransition } from './order-state-machine.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
-/**
- * Lớp Mutex xử lý kiểm soát đồng thời (Concurrency Control / Race-Condition Prevention)
- * Đảm bảo các giao dịch đặt hàng đồng thời được tuần tự hóa, tránh Lost Update và Dirty Read.
- */
-class AsyncMutex {
-  private queue = Promise.resolve();
-
-  async runExclusive<T>(fn: () => Promise<T> | T): Promise<T> {
-    let release: () => void;
-    const ticket = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const previous = this.queue;
-    this.queue = ticket;
-
-    await previous;
-    try {
-      return await fn();
-    } finally {
-      release!();
-    }
-  }
-}
+// Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
+const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.PENDING]: [
+    OrderStatus.PAID,
+    OrderStatus.PAYMENT_FAILED,
+    OrderStatus.CANCELLED,
+  ],
+  [OrderStatus.PAYMENT_FAILED]: [
+    OrderStatus.PAID,
+    OrderStatus.PENDING,
+    OrderStatus.CANCELLED,
+  ],
+  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+  [OrderStatus.PREPARING]: [OrderStatus.READY],
+  [OrderStatus.READY]: [OrderStatus.COMPLETED],
+  [OrderStatus.COMPLETED]: [],
+  [OrderStatus.CANCELLED]: [],
+};
 
 @Injectable()
 export class OrdersService {
   private readonly orders: Order[] = [];
-  private readonly mutex = new AsyncMutex();
+  constructor(private readonly prisma: PrismaService) {}
 
-  // =========================================================================
-  // TASK 10.2: QUẢN LÝ TỒN KHO & KIỂM SOÁT ĐỒNG THỜI (CONCURRENCY CONTROL)
-  // Bảng theo dõi số lượng tồn kho của từng sản phẩm trong kho
-  // =========================================================================
-  private readonly productStocks: Map<string, number> = new Map([
-    ['1', 50],
-    ['2', 50],
-    ['3', 30],
-    ['4', 40],
-    ['prod-1', 50],
-    ['prod-2', 50],
-    ['prod-tra-sua-olong', 25],
-    ['prod-cafe', 30],
-    ['prod-limited', 2], // Sản phẩm số lượng có hạn để kiểm thử race-condition chống bán vượt
-  ]);
-
-  /**
-   * Tạo đơn hàng mới với Transaction kiểm soát tồn kho đồng thời an toàn:
-   * 1. Kiểm tra tồn kho toàn bộ giỏ hàng (Validation Phase).
-   * 2. Trừ tồn kho đồng thời an toàn, ngăn chặn bán vượt tồn kho (Overselling Prevention).
-   * 3. Tạo đơn hàng và lưu trữ nhất quán (Consistent Transaction).
-   * 4. Tự động Rollback hoàn trả kho nếu xảy ra lỗi bất ngờ.
-   */
   async createOrder(
     createOrderDto: CreateOrderDto,
     userId: string | number = '0',
   ): Promise<Order> {
-    return this.mutex.runExclusive(async () => {
-      // -------------------------------------------------------------
-      // BƯỚC 1: KIỂM TRA TỒN KHO TOÀN BỘ SẢN PHẨM (Validation Phase)
-      // Chống bán vượt tồn kho (Overselling Prevention)
-      // -------------------------------------------------------------
-      for (const item of createOrderDto.items) {
-        const availableStock = this.getProductStock(item.productId);
-        if (availableStock < item.quantity) {
-          throw new BadRequestException(
-            `Sản phẩm ID "${item.productId}" không đủ tồn kho (Còn lại: ${availableStock}, yêu cầu: ${item.quantity}). Vui lòng giảm số lượng!`,
-          );
-        }
+    // Tính tổng tiền ước tính cho đơn hàng (Base: 35.000đ, Size M +5k, L +10k, mỗi topping +5k)
+    const totalAmount = createOrderDto.items.reduce((sum, item) => {
+      let itemPrice = 35000;
+      if (item.size === DrinkSize.M) itemPrice += 5000;
+      if (item.size === DrinkSize.L) itemPrice += 10000;
+      if (item.toppings && item.toppings.length > 0) {
+        itemPrice += item.toppings.length * 5000;
+      }
+      return sum + itemPrice * item.quantity;
+    }, 0);
+
+    const parsedUserId = Number(userId);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
+      throw new BadRequestException('Tài khoản người dùng không hợp lệ');
+    }
+
+    const productIds = createOrderDto.items.map((item) => Number(item.productId));
+    if (productIds.some((productId) => !Number.isInteger(productId) || productId <= 0)) {
+      throw new BadRequestException('Mã sản phẩm không hợp lệ');
+    }
+
+    const createdOrder = await this.prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, price: true },
+      });
+      const prices = new Map(products.map((product) => [product.id, product.price]));
+      if (products.length !== new Set(productIds).size) {
+        throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
       }
 
-      // -------------------------------------------------------------
-      // BƯỚC 2: TRANSACTION NGUYÊN TỬ (Atomic Deduction & Order Creation)
-      // Đảm bảo tạo đơn và trừ kho hoàn toàn nhất quán.
-      // -------------------------------------------------------------
-      const deductedItems: Array<{ productId: string; qty: number }> = [];
-
-      try {
-        // Trừ tồn kho từng sản phẩm
-        for (const item of createOrderDto.items) {
-          const currentStock = this.getProductStock(item.productId);
-          this.setProductStock(item.productId, currentStock - item.quantity);
-          deductedItems.push({ productId: item.productId, qty: item.quantity });
-        }
-
-        const timestamp = Date.now();
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-        const orderCode = `ORD-${timestamp}-${randomSuffix}`;
-
-        // Tính tổng tiền ước tính cho đơn hàng (Base: 35.000đ, Size M +5k, L +10k, mỗi topping +5k)
-        const totalAmount = createOrderDto.items.reduce((sum, item) => {
-          let itemPrice = 35000;
-          if (item.size === DrinkSize.M) itemPrice += 5000;
-          if (item.size === DrinkSize.L) itemPrice += 10000;
-          if (item.toppings && item.toppings.length > 0) {
-            itemPrice += item.toppings.length * 5000;
-          }
-          return sum + itemPrice * item.quantity;
-        }, 0);
-
-        const newOrder: Order = {
-          id:
-            typeof crypto !== 'undefined' && crypto.randomUUID
-              ? crypto.randomUUID()
-              : randomUUID(),
-          orderCode,
-          userId: String(userId),
-          items: createOrderDto.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            size: item.size,
-            toppings: item.toppings || [],
-          })),
-          status: OrderStatus.PENDING,
-          totalAmount,
-          promoCode: createOrderDto.promoCode,
-          pointsToUse: createOrderDto.pointsToUse,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        this.orders.push(newOrder);
-        return newOrder;
-      } catch (error) {
-        // ROLLBACK: Hoàn tác lại toàn bộ số lượng kho đã trừ nếu xảy ra lỗi
-        for (const d of deductedItems) {
-          const cur = this.getProductStock(d.productId);
-          this.setProductStock(d.productId, cur + d.qty);
-        }
-        throw error;
-      }
+      return tx.order.create({
+        data: {
+          userId: parsedUserId,
+          status: PrismaOrderStatus.PENDING,
+          subtotal: totalAmount,
+          discountAmount: 0,
+          total: totalAmount,
+          items: {
+            create: createOrderDto.items.map((item) => {
+              const productId = Number(item.productId);
+              const unitPrice = prices.get(productId);
+              if (unitPrice === undefined) {
+                throw new BadRequestException(`Không tìm thấy sản phẩm #${productId}`);
+              }
+              return {
+                productId,
+                size: item.size as ProductSize,
+                toppings: item.toppings || [],
+                unitPrice,
+                qty: item.quantity,
+                lineTotal: unitPrice * item.quantity,
+              };
+            }),
+          },
+        },
+        include: { items: true },
+      });
     });
-  }
 
-  findByUserId(userId: string | number, status?: OrderStatus): Order[] {
+    return {
+      id: String(createdOrder.id),
+      orderCode: `ORD-${createdOrder.id}`,
+      userId: String(createdOrder.userId),
+      items: createdOrder.items.map((item) => ({
+        productId: String(item.productId),
+        quantity: item.qty,
+        size: item.size as DrinkSize,
+        toppings: Array.isArray(item.toppings) ? (item.toppings as string[]) : [],
+      })),
+      status: createdOrder.status as OrderStatus,
+      totalAmount: createdOrder.total,
+      promoCode: createOrderDto.promoCode,
+      pointsToUse: createOrderDto.pointsToUse,
+      createdAt: createdOrder.createdAt,
+      updatedAt: createdOrder.updatedAt,
+    };
+  }
+  async findByUserId(userId: string | number, status?: OrderStatus): Promise<Order[]> {
     const targetUserId = String(userId);
+    try {
+      const uId = Number(userId);
+      if (uId) {
+        const dbOrders = await this.prisma.order.findMany({
+          where: {
+            userId: uId,
+            ...(status ? { status } : {}),
+          },
+          include: { items: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (dbOrders) {
+          return dbOrders.map((o) => ({
+            id: String(o.id),
+            orderCode: `ORD-${o.id}`,
+            userId: String(o.userId),
+            status: o.status as any,
+            totalAmount: o.total,
+            items: o.items.map((item) => ({
+              productId: String(item.productId),
+              quantity: item.qty,
+              size: item.size as any,
+              toppings: Array.isArray(item.toppings) ? (item.toppings as string[]) : [],
+            })),
+            createdAt: o.createdAt,
+            updatedAt: o.updatedAt,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Không thể đọc đơn hàng từ Database:', error);
+      throw error;
+    }
     return this.orders
       .filter((order) => {
-        const matchUser = order.userId === targetUserId;
+        const matchUser = String(order.userId) === targetUserId;
         const matchStatus = status ? order.status === status : true;
         return matchUser && matchStatus;
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  findByCode(orderCode: string): Order {
+  async findByCode(orderCode: string): Promise<Order> {
+    const orderId = orderCode.startsWith('ORD-') ? Number(orderCode.slice(4)) : Number(orderCode);
+    if (Number.isInteger(orderId) && orderId > 0) {
+      const dbOrder = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (dbOrder) {
+        return {
+          id: String(dbOrder.id),
+          orderCode: `ORD-${dbOrder.id}`,
+          userId: String(dbOrder.userId),
+          status: dbOrder.status as OrderStatus,
+          totalAmount: dbOrder.total,
+          items: dbOrder.items.map((item) => ({
+            productId: String(item.productId),
+            quantity: item.qty,
+            size: item.size as DrinkSize,
+            toppings: Array.isArray(item.toppings) ? (item.toppings as string[]) : [],
+          })),
+          createdAt: dbOrder.createdAt,
+          updatedAt: dbOrder.updatedAt,
+        };
+      }
+    }
     const order = this.orders.find(
       (o) => o.orderCode === orderCode || o.id === orderCode,
     );
     if (!order) {
-      throw new NotFoundException(
-        `Không tìm thấy đơn hàng với mã: ${orderCode}`,
-      );
+      throw new NotFoundException(`Không tìm thấy đơn hàng với mã: ${orderCode}`);
     }
     return order;
   }
@@ -171,59 +195,36 @@ export class OrdersService {
     );
   }
 
-  /**
-   * Chuyển trạng thái đơn hàng theo sơ đồ Order State Machine
-   * Tự động hoàn trả tồn kho (Restoration of Stock) khi đơn hàng bị hủy (CANCELLED).
-   */
-  transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Order {
-    const order = this.findByCode(orderCode);
-
-    if (!canTransition(order.status, nextStatus)) {
+  async transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Promise<Order> {
+    const order = await this.findByCode(orderCode);
+    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
+    if (!allowedNext.includes(nextStatus)) {
       throw new BadRequestException(
         `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
       );
     }
-
-    // Tự động hoàn trả lại tồn kho vào kho hàng nếu đơn bị hủy
-    if (nextStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
-      for (const item of order.items) {
-        const cur = this.getProductStock(item.productId);
-        this.setProductStock(item.productId, cur + item.quantity);
-      }
+    const orderId = Number(order.id);
+    if (Number.isInteger(orderId) && orderId > 0) {
+      const updatedOrder = await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: nextStatus as PrismaOrderStatus },
+        include: { items: true },
+      });
+      return {
+        id: order.id,
+        orderCode: order.orderCode,
+        userId: order.userId,
+        items: order.items,
+        totalAmount: updatedOrder.total,
+        status: updatedOrder.status as OrderStatus,
+        promoCode: order.promoCode,
+        pointsToUse: order.pointsToUse,
+        createdAt: order.createdAt,
+        updatedAt: updatedOrder.updatedAt,
+      };
     }
-
     order.status = nextStatus;
     order.updatedAt = new Date();
-
     return order;
-  }
-
-  // =========================================================================
-  // HELPER METHODS: QUẢN LÝ TỒN KHO PHỤC VỤ DEBUG & KIỂM THỬ (TESTING)
-  // =========================================================================
-
-  /**
-   * Lấy số lượng tồn kho hiện tại của một sản phẩm
-   */
-  getProductStock(productId: string): number {
-    return this.productStocks.get(productId) ?? 50; // Mặc định 50 nếu chưa cấu hình
-  }
-
-  /**
-   * Cập nhật số lượng tồn kho (Hữu ích khi setup kịch bản kiểm thử)
-   */
-  setProductStock(productId: string, stock: number): void {
-    this.productStocks.set(productId, Math.max(0, stock));
-  }
-
-  /**
-   * Lấy toàn bộ trạng thái tồn kho của hệ thống để debug
-   */
-  getAllStocks(): Record<string, number> {
-    const stocks: Record<string, number> = {};
-    for (const [key, val] of this.productStocks.entries()) {
-      stocks[key] = val;
-    }
-    return stocks;
   }
 }
