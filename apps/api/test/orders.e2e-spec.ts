@@ -33,7 +33,6 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
     );
     await app.init();
 
-    // Authenticate with seeded user
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'customer@brewlite.vn', password: '123456' });

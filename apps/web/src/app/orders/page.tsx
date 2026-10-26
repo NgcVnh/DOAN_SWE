@@ -77,7 +77,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Gọi API GET /orders/me (Task 9)
   const fetchMyOrders = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
@@ -143,7 +142,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     void fetchMyOrders();
   }, [fetchMyOrders]);
 
-  // Đặt lại các món trong đơn cũ vào giỏ hàng
   const handleReorder = (order: OrderView): void => {
     for (const item of order.items) {
       const mappedToppings = item.toppings.map((tName, idx) => {
@@ -167,7 +165,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     router.push('/cart');
   };
 
-  // Lọc danh sách đơn theo Tab trạng thái
   const filteredOrders = useMemo<OrderView[]>(() => {
     const currentTab = FILTER_TABS.find((t) => t.id === activeTab);
     if (!currentTab?.statuses) {
@@ -176,7 +173,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     return orders.filter((order) => currentTab.statuses!.includes(order.status));
   }, [orders, activeTab]);
 
-  // Thống kê nhanh
   const stats = useMemo(() => {
     const totalCount = orders.length;
     const activeCount = orders.filter((o) =>

@@ -34,7 +34,6 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   const router = useRouter();
   const { addToCart } = useCartStore();
 
-  // State tùy biến
   const [size, setSize] = useState<ProductSize>('M');
   const [sweetness, setSweetness] = useState<SweetnessLevel>('100%');
   const [ice, setIce] = useState<IceLevel>('Bình thường');
@@ -43,7 +42,6 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   const [specialNote, setSpecialNote] = useState<string>('');
   const [addedToast, setAddedToast] = useState<boolean>(false);
 
-  // Tính toán giá real-time
   const pricing = useMemo(() => {
     if (!product) return null;
     return calculateCustomizedPrice(product.price, size, selectedToppings, quantity);
@@ -51,7 +49,6 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
 
   if (!isOpen || !product || !pricing) return null;
 
-  // Xử lý chọn/bỏ topping
   const handleToggleTopping = (topping: ToppingOption) => {
     setSelectedToppings((prev) => {
       const exists = prev.some((t) => t.id === topping.id);
@@ -63,9 +60,7 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
     });
   };
 
-  // Xử lý thêm vào giỏ hàng
   const handleAddToCart = async () => {
-    // Bắt buộc phải đăng ký / đăng nhập thì mới được thêm vào giỏ
     const currentUser = getStoredUser();
     if (!currentUser) {
       onClose();

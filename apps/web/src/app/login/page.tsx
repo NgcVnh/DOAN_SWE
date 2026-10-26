@@ -12,19 +12,14 @@ function LoginForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const noticeMsg = searchParams.get('notice');
 
-  // State các trường thông tin trong form
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // State quản lý lỗi và trạng thái tải
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Xác thực biểu mẫu phía Client
-   */
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -45,9 +40,6 @@ function LoginForm() {
     return Object.keys(errors).length === 0;
   };
 
-  /**
-   * Xử lý gửi biểu mẫu Đăng nhập
-   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError(null);
@@ -81,12 +73,10 @@ function LoginForm() {
         }
       }
 
-      // Lưu trữ Access Token và thông tin User an toàn vào localStorage
       if (data.accessToken && data.user) {
         saveAuthData(data.accessToken, data.user);
       }
 
-      // Điều hướng về trang đích (trang sản phẩm hoặc trang trước đó)
       router.push(redirectUrl);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Có lỗi kết nối tới máy chủ';

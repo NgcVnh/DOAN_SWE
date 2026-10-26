@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding BrewLite initial data...');
 
-  // 1. Seed Products
   const products = [
     {
       name: 'Cà phê sữa đá',
@@ -58,7 +57,6 @@ async function main() {
     }
   }
 
-  // 2. Seed Toppings
   const toppings = [
     { name: 'Trân châu đen', price: 10000, isAvailable: true },
     { name: 'Trân châu trắng', price: 10000, isAvailable: true },
@@ -73,7 +71,6 @@ async function main() {
     }
   }
 
-  // 3. Seed Promotions
   const promotions = [
     {
       code: 'BREWLITE20',
@@ -83,7 +80,7 @@ async function main() {
       maxDiscount: 30000,
       usageLimit: 100,
       isActive: true,
-      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days later
+      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 
     },
     {
       code: 'GIAM10K',
@@ -104,7 +101,6 @@ async function main() {
     }
   }
 
-  // 4. Seed Demo User (password is '123456')
   const demoEmail = 'customer@brewlite.vn';
   const realPasswordHash = await bcrypt.hash('123456', 10);
   await prisma.user.upsert({
@@ -120,7 +116,6 @@ async function main() {
     },
   });
 
-  // 5. Seed Demo Order (Pending) for Checkout test
   const existingOrder = await prisma.order.findUnique({ where: { id: 1 } });
   if (!existingOrder) {
     const demoUser = await prisma.user.findUnique({ where: { email: demoEmail } });
@@ -139,7 +134,6 @@ async function main() {
     }
   }
 
-  // 6. Đồng bộ sequence ID trong PostgreSQL sau khi chèn dữ liệu mẫu
   await prisma.$executeRawUnsafe(
     `SELECT setval(pg_get_serial_sequence('orders', 'id'), COALESCE((SELECT MAX(id) FROM orders), 1));`
   );

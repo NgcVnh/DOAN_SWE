@@ -9,10 +9,6 @@ export interface JwtPayload {
   email: string;
 }
 
-/**
- * [OOP - Strategy Pattern]
- * JwtStrategy mở rộng từ PassportStrategy để xử lý xác thực Bearer Token từ header HTTP request.
- */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -26,9 +22,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  /**
-   * Phương thức validate được Passport tự động gọi sau khi giải mã và kiểm tra hạn JWT thành công.
-   */
   async validate(payload: JwtPayload) {
     try {
       if (this.prisma?.isConnected) {
@@ -46,7 +39,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         if (user) return user;
       }
     } catch {
-      // Fallback
     }
 
     const user = await this.authService.getProfile(payload.sub);

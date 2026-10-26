@@ -22,7 +22,6 @@ export default function Home() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Task 3: Next.js gọi trực tiếp endpoint /products của Backend Task 2
   const fetchProducts = async () => {
     setLoading(true);
     setError(null);
@@ -47,13 +46,11 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Kiểm tra trạng thái đăng nhập từ localStorage
     const user = getStoredUser();
     if (user) {
       setCurrentUser(user);
     }
 
-    // Lấy danh sách sản phẩm
     fetchProducts();
   }, []);
 

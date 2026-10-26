@@ -6,10 +6,6 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Lấy toàn bộ danh sách sản phẩm từ bảng products qua Prisma ORM
-   * Tự động fallback sang menu mặc định nếu PostgreSQL chưa được bật
-   */
   async findAll(): Promise<Products[]> {
     try {
       if (this.prisma?.isConnected !== false && this.prisma?.product?.findMany) {
@@ -28,7 +24,6 @@ export class ProductsService {
         }
       }
     } catch {
-      // Nếu CSDL chưa được khởi động hoặc lỗi kết nối, chuyển sang dữ liệu mẫu dự phòng
     }
 
     return [

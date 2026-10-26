@@ -42,10 +42,6 @@ export function canTransition(
   return allowedTransitions[currentStatus]?.includes(nextStatus) ?? false;
 }
 
-/**
- * [Task 10.1 - Order State Machine]
- * Chặn mọi chuyển trạng thái không hợp lệ theo sơ đồ nghiệp vụ và ném lỗi BadRequestException
- */
 export function assertTransition(
   currentStatus: OrderStatus,
   nextStatus: OrderStatus,

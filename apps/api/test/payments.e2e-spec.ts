@@ -27,7 +27,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    // Chuẩn bị người dùng test
     const user = await prisma.user.upsert({
       where: { email: 'e2e_payments_user@brewlite.vn' },
       update: {},
@@ -66,9 +65,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     });
   }
 
-  // =========================================================================
-  // 1. THANH TOÁN THÀNH CÔNG VỚI WALLET VÀ CARD
-  // =========================================================================
   it('POST /payments - should successfully process payment via WALLET strategy', async () => {
     const order = await createOrder(OrderStatus.PENDING, 55000);
     const key = `e2e-wallet-${Date.now()}`;
@@ -111,14 +107,10 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(res.body.payment.transactionRef).toMatch(/^CARD_/);
   });
 
-  // =========================================================================
-  // 2. CHỐNG XỬ LÝ TRÙNG LẶP (IDEMPOTENCY)
-  // =========================================================================
   it('POST /payments - should return cached result on duplicate idempotencyKey (Idempotency)', async () => {
     const order = await createOrder(OrderStatus.PENDING, 60000);
     const key = `e2e-idemp-${Date.now()}`;
 
-    // Lần 1
     const firstRes = await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -131,7 +123,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
 
     expect(firstRes.body.isIdempotent).toBe(false);
 
-    // Lần 2 (trùng key)
     const secondRes = await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -160,7 +151,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
       })
       .expect(201);
 
-    // Thử lại với order2
     const conflictRes = await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -173,11 +163,7 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(conflictRes.body.message).toContain('đã được sử dụng');
   });
 
-  // =========================================================================
-  // 3. VALIDATION DTO VỚI CLASS-VALIDATOR
-  // =========================================================================
   it('POST /payments - should fail with 400 Bad Request when payload is invalid', async () => {
-    // Thiếu idempotencyKey
     await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -186,7 +172,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
       })
       .expect(400);
 
-    // Sai phương thức thanh toán
     await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -196,7 +181,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
       })
       .expect(400);
 
-    // orderId không hợp lệ
     await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -207,14 +191,10 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
       .expect(400);
   });
 
-  // =========================================================================
-  // 4. LUỒNG THẤT BẠI VÀ THỬ LẠI (PAYMENT_FAILED -> RETRY -> PAID)
-  // =========================================================================
   it('POST /payments - should handle failure and allow retry with new idempotency key', async () => {
     const order = await createOrder(OrderStatus.PENDING, 99000);
     const failKey = `e2e-fail-${Date.now()}`;
 
-    // Lần 1 thất bại
     const failRes = await request(app.getHttpServer())
       .post('/payments')
       .send({
@@ -228,7 +208,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(failRes.body.success).toBe(false);
     expect(failRes.body.orderStatus).toBe('PAYMENT_FAILED');
 
-    // Lần 2 thử lại với key mới
     const retryKey = `e2e-retry-${Date.now()}`;
     const retryRes = await request(app.getHttpServer())
       .post('/payments')
@@ -244,9 +223,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(retryRes.body.orderStatus).toBe('PAID');
   });
 
-  // =========================================================================
-  // 5. CHẶN THANH TOÁN ĐƠN ĐÃ HOÀN TẤT / ĐÃ THANH TOÁN
-  // =========================================================================
   it('POST /payments - should reject payment for already PAID order with 400 Bad Request', async () => {
     const order = await createOrder(OrderStatus.PAID, 40000);
     const key = `e2e-paid-reject-${Date.now()}`;
@@ -263,9 +239,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(res.body.message).toContain('Không thể thanh toán cho đơn hàng đang ở trạng thái "PAID"');
   });
 
-  // =========================================================================
-  // 6. TRA CỨU PAYMENT QUA GET ENDPOINTS
-  // =========================================================================
   it('GET /payments/order/:orderId - should retrieve payment history for an order', async () => {
     const order = await createOrder(OrderStatus.PENDING, 65000);
     const key = `e2e-history-${Date.now()}`;
@@ -287,7 +260,6 @@ describe('PaymentsController (e2e - HTTP Integration Tests)', () => {
     expect(historyRes.body.length).toBeGreaterThanOrEqual(1);
     expect(historyRes.body[0].id).toBe(payRes.body.payment.id);
 
-    // Tra cứu chi tiết qua GET /payments/:id
     const singleRes = await request(app.getHttpServer())
       .get(`/payments/${payRes.body.payment.id}`)
       .expect(200);

@@ -10,16 +10,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 
-/**
- * [OOP - Single Responsibility Principle]
- * AuthService đảm nhận toàn bộ nghiệp vụ logic xác thực:
- * - Đăng ký tài khoản mới (băm mật khẩu, chống trùng email).
- * - Đăng nhập tài khoản (so sánh hash, phát hành JWT token).
- * - Hỗ trợ In-Memory Fallback khi CSDL PostgreSQL ngoại tuyến.
- */
 @Injectable()
 export class AuthService {
-  // Bộ nhớ in-memory lưu trữ người dùng khi PostgreSQL chưa được bật
   private readonly inMemoryUsersByEmail = new Map<string, any>();
   private readonly inMemoryUsersById = new Map<number, any>();
   private nextUserId = 1;
@@ -29,13 +21,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  /**
-   * Đăng ký tài khoản mới
-   */
   async register(dto: RegisterDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
 
-    // 1. Nếu CSDL PostgreSQL đang kết nối
     if (this.prisma?.isConnected) {
       try {
         const existingUser = await this.prisma.user.findUnique({
@@ -72,11 +60,9 @@ export class AuthService {
         };
       } catch (error: any) {
         if (error instanceof ConflictException) throw error;
-        // Nếu lỗi kết nối CSDL, tự động chuyển xuống In-Memory Fallback
       }
     }
 
-    // 2. Chế độ In-Memory an toàn (khi DB PostgreSQL chưa khởi động)
     if (this.inMemoryUsersByEmail.has(normalizedEmail)) {
       throw new ConflictException('Email này đã được đăng ký. Vui lòng sử dụng email khác.');
     }
@@ -110,9 +96,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Đăng nhập tài khoản và cấp phát JWT token
-   */
   async login(dto: LoginDto) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const invalidCredentialsMsg = 'Email hoặc mật khẩu không chính xác';
@@ -162,9 +145,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Lấy thông tin tài khoản hiện tại từ Token
-   */
   async getProfile(userId: number | string) {
     const numericId = Number(userId);
 
@@ -183,7 +163,6 @@ export class AuthService {
         });
         if (user) return user;
       } catch {
-        // Fallback
       }
     }
 

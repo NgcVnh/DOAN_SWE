@@ -34,7 +34,6 @@ export class OrdersController {
     return await this.ordersService.findByUserId(userId, query?.status);
   }
 
-  // Hỗ trợ xem chi tiết đơn và chuyển trạng thái 
   @Get(':orderCode')
   async getOrder(@Param('orderCode') orderCode: string): Promise<Order> {
     return await this.ordersService.findByCode(orderCode);
