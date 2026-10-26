@@ -40,7 +40,7 @@ export interface OrderStatusMeta {
   description: string;
   badgeClass: string;
   dotClass: string;
-  stepIndex: number; // 0..4 cho luồng chính, -1 cho nhánh ngoại lệ
+  stepIndex: number;
   nextDemoStatus?: OrderStatusType;
   nextDemoLabel?: string;
   canCancel: boolean;
@@ -205,7 +205,6 @@ export function normalizeOrderItem(raw: unknown): OrderItemView {
         ? raw.qty
         : 1;
 
-  // Chuẩn hóa danh sách toppings (hỗ trợ cả string[] lẫn Array<{ name: string }>)
   const toppings: string[] = [];
   if (Array.isArray(raw.toppings)) {
     for (const t of raw.toppings) {
@@ -217,7 +216,6 @@ export function normalizeOrderItem(raw: unknown): OrderItemView {
     }
   }
 
-  // Tính đơn giá nếu API không trả về trực tiếp
   const basePrice = catalogProduct?.price ?? 35000;
   const sizeAddon = SIZE_PRICES[size] ?? 0;
   const toppingsAddon = toppings.reduce((sum, tName) => {

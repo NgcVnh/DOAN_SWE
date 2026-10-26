@@ -77,7 +77,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Gọi API GET /orders/me (Task 9)
   const fetchMyOrders = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
@@ -143,7 +142,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     void fetchMyOrders();
   }, [fetchMyOrders]);
 
-  // Đặt lại các món trong đơn cũ vào giỏ hàng
   const handleReorder = (order: OrderView): void => {
     for (const item of order.items) {
       const mappedToppings = item.toppings.map((tName, idx) => {
@@ -167,7 +165,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     router.push('/cart');
   };
 
-  // Lọc danh sách đơn theo Tab trạng thái
   const filteredOrders = useMemo<OrderView[]>(() => {
     const currentTab = FILTER_TABS.find((t) => t.id === activeTab);
     if (!currentTab?.statuses) {
@@ -176,7 +173,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
     return orders.filter((order) => currentTab.statuses!.includes(order.status));
   }, [orders, activeTab]);
 
-  // Thống kê nhanh
   const stats = useMemo(() => {
     const totalCount = orders.length;
     const activeCount = orders.filter((o) =>
@@ -194,7 +190,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
       <Header />
 
       <main className="max-w-md mx-auto md:max-w-4xl lg:max-w-5xl px-4 py-6 sm:py-8 flex-1 w-full space-y-6">
-        {/* Tiêu đề trang & Nút tải lại */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-amber-950 flex items-center gap-2.5">
@@ -219,7 +214,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Thẻ tóm tắt thống kê (Summary Cards) */}
         {!loading && !error && !isUnauthenticated && orders.length > 0 && (
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-stone-200/80 shadow-xs">
@@ -245,7 +239,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
-        {/* Bộ lọc trạng thái đơn hàng */}
         <div className="bg-white rounded-2xl p-3 sm:p-4 border border-stone-200/90 shadow-xs">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {FILTER_TABS.map((tab) => {
@@ -280,7 +273,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* 1. Trạng thái Loading (Skeleton) */}
         {loading && (
           <div className="space-y-4">
             {[1, 2, 3].map((item) => (
@@ -306,7 +298,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
-        {/* 2. Trạng thái Lỗi (Error state) */}
         {!loading && error && (
           <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
@@ -326,7 +317,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
-        {/* 3. Trạng thái Trống (Empty state) */}
         {!loading && !error && !isUnauthenticated && filteredOrders.length === 0 && (
           <div className="mx-auto max-w-md rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center shadow-xs my-6">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600 mb-4">
@@ -362,7 +352,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
           </div>
         )}
 
-        {/* 4. Danh sách đơn hàng (Order List) */}
         {!loading && !error && !isUnauthenticated && filteredOrders.length > 0 && (
           <div className="space-y-4">
             {filteredOrders.map((order) => {
@@ -373,7 +362,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                   key={order.id}
                   className="bg-white rounded-2xl border border-stone-200/90 shadow-xs hover:border-amber-300/90 transition overflow-hidden"
                 >
-                  {/* Phần đầu Card: Mã đơn + Thời gian + Badge trạng thái */}
                   <div className="px-4 sm:px-5 py-3.5 bg-stone-50/70 border-b border-stone-100 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <span className="font-mono font-bold text-sm sm:text-base text-amber-950">
@@ -394,7 +382,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                     </span>
                   </div>
 
-                  {/* Thanh tiến trình Order State Machine (Mục 9.1) */}
                   <div className="px-4 sm:px-5 pt-4 pb-2">
                     {meta.stepIndex >= 0 ? (
                       <div className="space-y-2">
@@ -448,7 +435,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                     )}
                   </div>
 
-                  {/* Danh sách các món trong đơn */}
                   <div className="px-4 sm:px-5 py-3 divide-y divide-stone-100">
                     {order.items.map((item, idx) => (
                       <div
@@ -488,7 +474,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                     ))}
                   </div>
 
-                  {/* Phần chân Card: Tổng tiền & Các nút hành động */}
                   <div className="px-4 sm:px-5 py-3.5 bg-stone-50/50 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div>
@@ -509,7 +494,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
-                      {/* Nếu đơn đang PENDING hoặc PAYMENT_FAILED -> Cho phép Thanh toán lại */}
                       {meta.canRetryPayment && (
                         <Link
                           href={`/checkout?orderCode=${encodeURIComponent(order.orderCode)}&amount=${order.totalAmount}`}
@@ -520,7 +504,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                         </Link>
                       )}
 
-                      {/* Nút Đặt lại đơn */}
                       <button
                         type="button"
                         onClick={() => handleReorder(order)}
@@ -530,7 +513,6 @@ export default function OrderHistoryPage(): React.JSX.Element {
                         <span>Đặt lại</span>
                       </button>
 
-                      {/* Nút Xem chi tiết đơn */}
                       <Link
                         href={`/orders/${encodeURIComponent(order.orderCode)}`}
                         className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition"

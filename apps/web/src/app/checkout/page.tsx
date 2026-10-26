@@ -26,10 +26,7 @@ function CheckoutContent(): React.JSX.Element {
     fetchCart();
   }, [fetchCart]);
 
-  // State lưu phương thức thanh toán người dùng chọn (Ví điện tử hoặc Thẻ ngân hàng)
   const [method, setMethod] = useState<PaymentMethodType>('WALLET');
-
-  // State quản lý trạng thái gọi API
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [orderPaidResult, setOrderPaidResult] = useState<OrderPaidResult | null>(null);
@@ -37,7 +34,6 @@ function CheckoutContent(): React.JSX.Element {
 
   const [orderId] = useState<number>(1);
 
-  // Ưu tiên lấy tổng tiền từ query (khi thanh toán lại), hoặc từ Giỏ hàng, hoặc mặc định 123.000đ theo Wireframe
   const displayAmount =
     retryAmountParam && Number(retryAmountParam) > 0
       ? Number(retryAmountParam)
@@ -45,9 +41,6 @@ function CheckoutContent(): React.JSX.Element {
         ? cartTotal
         : 123000;
 
-  /**
-   * Hàm xử lý khi khách hàng bấm nút "Xác nhận trả"
-   */
   const handleConfirmPayment = async (): Promise<void> => {
     setLoading(true);
     setErrorMessage(null);
@@ -62,7 +55,6 @@ function CheckoutContent(): React.JSX.Element {
     let returnedOrderId: number | string = orderId;
 
     try {
-      // 1. Nếu chưa có mã đơn (đặt mới từ giỏ hàng), gọi POST /orders để lưu vào Lịch sử đơn (GET /orders/me)
       if (!currentOrderCode) {
         const orderPayloadItems =
           items.length > 0
@@ -116,12 +108,9 @@ function CheckoutContent(): React.JSX.Element {
               }
             }
           }
-        } catch {
-          // Bỏ qua nếu dịch vụ tạo đơn phụ không phản hồi, tiếp tục luồng thanh toán chính
-        }
+        } catch {}
       }
 
-      // 2. Gọi POST /payments kèm Idempotency Key
       const idempotencyKey = crypto.randomUUID();
       let paymentSucceeded = true;
       let serverErrorMessage: string | null = null;
@@ -160,7 +149,6 @@ function CheckoutContent(): React.JSX.Element {
         paymentSucceeded = true;
       }
 
-      // 3. Đồng bộ trạng thái đơn hàng sang OrdersService (PAID hoặc PAYMENT_FAILED) để hiển thị trong GET /orders/me
       if (currentOrderCode) {
         try {
           await fetch(`${apiUrl}/orders/${encodeURIComponent(currentOrderCode)}/status`, {
@@ -173,13 +161,10 @@ function CheckoutContent(): React.JSX.Element {
               status: paymentSucceeded ? 'PAID' : 'PAYMENT_FAILED',
             }),
           });
-        } catch {
-          // Không chặn luồng chính nếu PATCH phụ lỗi
-        }
+        } catch {}
       }
 
       if (paymentSucceeded) {
-        // [Thành công]: Chuyển sang màn hình Xác nhận (Task 9)
         setOrderPaidResult({
           orderId: returnedOrderId,
           orderCode: currentOrderCode || `ORD-${returnedOrderId}`,
@@ -200,7 +185,6 @@ function CheckoutContent(): React.JSX.Element {
     }
   };
 
-  // Màn hình (5) Xác nhận đơn hàng khi thanh toán thành công (PAID) - Task 9
   if (orderPaidResult) {
     return (
       <div className="min-h-screen bg-amber-50/40 flex items-center justify-center p-4">
@@ -250,7 +234,6 @@ function CheckoutContent(): React.JSX.Element {
     );
   }
 
-  // Màn hình (4) Chọn phương thức Thanh toán theo đúng Wireframe đề bài
   return (
     <div className="min-h-screen bg-amber-50/40 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
@@ -277,7 +260,6 @@ function CheckoutContent(): React.JSX.Element {
           </p>
         </div>
 
-        {/* Chọn phương thức thanh toán */}
         <div className="py-6 space-y-3">
           <p className="text-sm font-semibold text-slate-700">
             Phương thức thanh toán (Không dùng tiền mặt):
@@ -322,7 +304,6 @@ function CheckoutContent(): React.JSX.Element {
           </label>
         </div>
 
-        {/* Hiển thị lỗi khi thanh toán thất bại (PAYMENT_FAILED) */}
         {errorMessage && (
           <div className="p-4 mb-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
             <p className="font-bold">⚠️ Thanh toán thất bại (PAYMENT_FAILED)</p>

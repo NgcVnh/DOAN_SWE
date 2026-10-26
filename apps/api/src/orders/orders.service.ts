@@ -5,7 +5,6 @@ import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-// Bảng ánh xạ trạng thái hợp lệ theo Order State Machine (Mục 9.1)
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [
     OrderStatus.PAID,
@@ -33,7 +32,6 @@ export class OrdersService {
     createOrderDto: CreateOrderDto,
     userId: string | number = '0',
   ): Promise<Order> {
-    // Tính tổng tiền ước tính cho đơn hàng (Base: 35.000đ, Size M +5k, L +10k, mỗi topping +5k)
     const totalAmount = createOrderDto.items.reduce((sum, item) => {
       let itemPrice = 35000;
       if (item.size === DrinkSize.M) itemPrice += 5000;
@@ -111,6 +109,7 @@ export class OrdersService {
       updatedAt: createdOrder.updatedAt,
     };
   }
+
   async findByUserId(userId: string | number, status?: OrderStatus): Promise<Order[]> {
     const targetUserId = String(userId);
     try {

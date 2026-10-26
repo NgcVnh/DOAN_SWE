@@ -6,14 +6,8 @@ import { PaymentStrategy } from './strategies/payment-strategy.interface.js';
 import { WalletPaymentStrategy } from './strategies/wallet-payment.strategy.js';
 import { CardPaymentStrategy } from './strategies/card-payment.strategy.js';
 
-/**
- * [OOP - Dependency Injection & Polymorphism]
- * PaymentsService nhận các dependency thông qua Constructor (Dependency Injection)
- * và điều phối luồng nghiệp vụ thanh toán + cập nhật trạng thái đơn hàng.
- */
 @Injectable()
 export class PaymentsService {
-  // Thuộc tính private đóng gói bảng ánh xạ các chiến lược thanh toán (Encapsulation)
   private readonly strategies: Record<PaymentMethod, PaymentStrategy>;
 
   constructor(
@@ -21,23 +15,16 @@ export class PaymentsService {
     private readonly walletStrategy: WalletPaymentStrategy,
     private readonly cardStrategy: CardPaymentStrategy,
   ) {
-    // Khởi tạo map ánh xạ từ Enum PaymentMethod sang đối tượng Strategy tương ứng
     this.strategies = {
       [PaymentMethod.WALLET]: this.walletStrategy,
       [PaymentMethod.CARD]: this.cardStrategy,
     };
   }
 
-  /**
-   * Hàm xử lý nghiệp vụ thanh toán cho đơn hàng
-   */
   async processPayment(dto: CreatePaymentDto) {
-    // =========================================================================
-    // BƯỚC 1: KIỂM TRA IDEMPOTENCY KEY (Chống thanh toán trùng lặp 2 lần)
-    // =========================================================================
     const existingPayment = await this.prisma.payment.findUnique({
-      where: { idempotencyKey: dto.idempotencyKey},
-      include: { order: true},
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { order: true },
     });
 
     if (existingPayment) {
@@ -47,13 +34,10 @@ export class PaymentsService {
         orderId: existingPayment.orderId,
         orderStatus: existingPayment.order.status,
         payment: existingPayment,
-      }
+      };
     }
 
-    // =========================================================================
-    // BƯỚC 2: TÌM ĐƠN HÀNG & KIỂM TRA ORDER STATE MACHINE
-    // =========================================================================
-     const order = await this.prisma.order.findUnique({
+    const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },
     });
 
@@ -61,7 +45,6 @@ export class PaymentsService {
       throw new NotFoundException(`Không tìm thấy đơn hàng #${dto.orderId}`);
     }
 
-    // Theo sơ đồ trạng thái mục 9.1: Chỉ PENDING hoặc PAYMENT_FAILED mới được thanh toán
     const validStatuses: OrderStatus[] = [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED];
     if (!validStatuses.includes(order.status)) {
       throw new BadRequestException(
@@ -69,18 +52,12 @@ export class PaymentsService {
       );
     }
 
-    // =========================================================================
-    // BƯỚC 3: GỌI CỔNG THANH TOÁN THEO ĐA HÌNH (POLYMORPHISM)
-    // =========================================================================
     const strategy = this.strategies[dto.method];
     if (!strategy) {
       throw new BadRequestException(`Phương thức thanh toán không hợp lệ: ${dto.method}`);
     }
     const gatewayResult = await strategy.charge(order.total, dto.mockSuccess ?? true);
 
-    // =========================================================================
-    // BƯỚC 4: CẬP NHẬT DATABASE TRONG TRANSACTION (Đảm bảo tính toàn vẹn ACID)
-    // =========================================================================
     const newPaymentStatus = gatewayResult.success ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
     const newOrderStatus = gatewayResult.success ? OrderStatus.PAID : OrderStatus.PAYMENT_FAILED;
 
@@ -110,11 +87,6 @@ export class PaymentsService {
       return { payment, order: updatedOrder };
     });
 
-
-    
-    // =========================================================================
-    // BƯỚC 5: TRẢ KẾT QUẢ VỀ CHO CONTROLLER / FRONTEND
-    // =========================================================================
     return {
       success: gatewayResult.success,
       orderId: result.order.id,
@@ -124,4 +96,3 @@ export class PaymentsService {
     };
   }
 }
-
