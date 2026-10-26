@@ -43,7 +43,7 @@ describe('OrdersController (e2e)', () => {
     const payload = {
       items: [
         {
-          productId: 'prod-tra-sua-olong',
+          productId: '1',
           quantity: 2,
           size: 'M',
           toppings: ['Trân châu đen', 'Thạch phô mai'],
