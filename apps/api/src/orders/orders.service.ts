@@ -59,7 +59,6 @@ export class OrdersService {
         throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
       }
 
-      // Tính tổng tiền sản phẩm (subtotal) dựa trên giá chuẩn từ database
       let calculatedSubtotal = 0;
       const orderItemsData = createOrderDto.items.map((item) => {
         const productId = Number(item.productId);
@@ -68,10 +67,14 @@ export class OrdersService {
           throw new BadRequestException(`Không tìm thấy sản phẩm #${productId}`);
         }
         let unitPrice = basePrice;
-        if (item.size === DrinkSize.M) unitPrice += 5000;
-        if (item.size === DrinkSize.L) unitPrice += 10000;
-        if (item.toppings && item.toppings.length > 0) {
-          unitPrice += item.toppings.length * 5000;
+        if (typeof item.unitPrice === 'number' && item.unitPrice >= basePrice) {
+          unitPrice = item.unitPrice;
+        } else {
+          if (item.size === DrinkSize.M) unitPrice += 5000;
+          if (item.size === DrinkSize.L) unitPrice += 10000;
+          if (item.toppings && item.toppings.length > 0) {
+            unitPrice += item.toppings.length * 5000;
+          }
         }
         const lineTotal = unitPrice * item.quantity;
         calculatedSubtotal += lineTotal;
@@ -85,7 +88,6 @@ export class OrdersService {
         };
       });
 
-      // 1. Kiểm tra tài khoản người dùng
       const user = await tx.user.findUnique({
         where: { id: parsedUserId },
         select: { id: true, loyaltyPoints: true },
@@ -94,7 +96,6 @@ export class OrdersService {
         throw new NotFoundException(`Không tìm thấy tài khoản người dùng #${parsedUserId}`);
       }
 
-      // 2. Nghiệp vụ Khuyến mãi (Task 10.3 - Strategy Pattern)
       let promoDiscount = 0;
       let appliedPromotionId: number | null = null;
       if (createOrderDto.promoCode) {
@@ -106,7 +107,6 @@ export class OrdersService {
         appliedPromotionId = promoResult.promotion.id;
       }
 
-      // 3. Nghiệp vụ Điểm thưởng (Task 10.3 - Loyalty Points)
       const remainingAfterPromo = Math.max(0, calculatedSubtotal - promoDiscount);
       let pointsDiscount = 0;
       let pointsActuallyUsed = 0;
@@ -124,7 +124,6 @@ export class OrdersService {
       const finalTotal = Math.max(0, calculatedSubtotal - totalDiscount);
       const pointsEarned = this.loyaltyService.calculatePointsEarned(finalTotal);
 
-      // 4. Khấu trừ điểm và ghi nhận lượt dùng mã trong transaction (Atomicity)
       if (pointsActuallyUsed > 0) {
         await this.loyaltyService.deductPointsInTransaction(tx, parsedUserId, pointsActuallyUsed);
       }

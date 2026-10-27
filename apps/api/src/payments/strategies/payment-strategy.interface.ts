@@ -10,6 +10,7 @@ export interface PaymentContext {
   orderCode?: string;
   ipAddr?: string;
   returnUrl?: string;
+  useSandbox?: boolean;
 }
 
 export abstract class PaymentStrategy {
