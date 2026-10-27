@@ -1,6 +1,7 @@
 export enum PaymentMethod {
   WALLET = 'WALLET',
   CARD = 'CARD',
+  VNPAY = 'VNPAY',
 }
 
 export enum PaymentStatus {

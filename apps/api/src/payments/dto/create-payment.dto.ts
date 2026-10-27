@@ -6,7 +6,7 @@ export class CreatePaymentDto {
   @Min(1)
   orderId!: number;
 
-  @IsEnum(PaymentMethod, { message: 'Phương thức thanh toán phải là WALLET hoặc CARD' })
+  @IsEnum(PaymentMethod, { message: 'Phương thức thanh toán phải là WALLET, CARD hoặc VNPAY' })
   method!: PaymentMethod;
 
   @IsString()
@@ -16,5 +16,9 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsBoolean()
   mockSuccess?: boolean;
+
+  @IsOptional()
+  @IsString()
+  ipAddr?: string;
 }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 
@@ -11,4 +11,8 @@ export class PaymentsController {
     return this.paymentsService.processPayment(dto);
   }
 
+  @Get('vnpay-return')
+  async handleVnpayReturn(@Query() query: Record<string, string>) {
+    return this.paymentsService.verifyVnpayReturn(query);
+  }
 }

@@ -7,7 +7,7 @@ import { ClipboardList, ArrowLeft, Tag, Award, CheckCircle2, AlertCircle } from 
 import { useCartStore } from '@/store/useCartStore';
 import { getAuthToken, updateStoredUserPoints } from '@/lib/auth';
 
-type PaymentMethodType = 'WALLET' | 'CARD';
+type PaymentMethodType = 'WALLET' | 'CARD' | 'VNPAY';
 
 interface OrderPaidResult {
   orderId: number | string;
@@ -206,7 +206,15 @@ function CheckoutContent(): React.JSX.Element {
             orderStatus?: string;
             orderId?: number | string;
             errorMessage?: string;
+            paymentUrl?: string;
           };
+
+          if (paymentObj.paymentUrl) {
+            clearCart();
+            window.location.href = paymentObj.paymentUrl;
+            return;
+          }
+
           paymentSucceeded = paymentObj.orderStatus === 'PAID';
           if (paymentObj.orderId !== undefined) {
             returnedOrderId = paymentObj.orderId;
@@ -512,6 +520,25 @@ function CheckoutContent(): React.JSX.Element {
             <div>
               <p className="font-semibold text-slate-800 text-sm">Thẻ ngân hàng (ATM / Visa)</p>
               <p className="text-xs text-slate-500">Thanh toán qua cổng thẻ nội địa hoặc quốc tế</p>
+            </div>
+          </label>
+
+          <label
+            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
+              method === 'VNPAY' ? 'border-emerald-600 bg-emerald-50/50' : 'border-slate-200'
+            }`}
+          >
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="VNPAY"
+              checked={method === 'VNPAY'}
+              onChange={() => setMethod('VNPAY')}
+              className="w-4 h-4 accent-emerald-600"
+            />
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Cổng VNPAY (Sandbox chính thức)</p>
+              <p className="text-xs text-slate-500">Chuyển hướng cổng VNPay thật, nhập thẻ NCB test (9704198526191432198)</p>
             </div>
           </label>
         </div>
