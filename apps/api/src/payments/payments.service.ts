@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
@@ -22,12 +22,21 @@ export class PaymentsService {
   }
 
   async processPayment(dto: CreatePaymentDto) {
+    if (!dto.idempotencyKey || typeof dto.idempotencyKey !== "string" || !dto.idempotencyKey.trim()) {
+      throw new BadRequestException("Idempotency key không được để trống hoặc chỉ chứa khoảng trắng");
+    }
+
     const existingPayment = await this.prisma.payment.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
       include: { order: true },
     });
 
     if (existingPayment) {
+      if (existingPayment.orderId !== dto.orderId || existingPayment.method !== dto.method) {
+        throw new ConflictException(
+          `Idempotency key "${dto.idempotencyKey}" đã được sử dụng cho một đơn hàng hoặc phương thức khác`,
+        );
+      }
       return {
         success: existingPayment.status === PaymentStatus.SUCCESS,
         isIdempotent: true,

@@ -10,33 +10,25 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
 
-  // State các trường thông tin trong form
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Tùy chọn ẩn / hiện mật khẩu
   const [showPassword, setShowPassword] = useState(false);
 
-  // State quản lý lỗi và trạng thái tải
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Xác thực phía Client trước khi gửi request lên máy chủ
-   */
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    // 1. Kiểm tra Họ và tên
     if (!fullName.trim()) {
       errors.fullName = 'Vui lòng nhập họ và tên của bạn';
     }
 
-    // 2. Kiểm tra Email
     if (!email.trim()) {
       errors.email = 'Vui lòng nhập địa chỉ email';
     } else {
@@ -46,14 +38,12 @@ function RegisterForm() {
       }
     }
 
-    // 3. Kiểm tra Mật khẩu (thống nhất với backend: tối thiểu 6 ký tự)
     if (!password) {
       errors.password = 'Vui lòng nhập mật khẩu';
     } else if (password.length < 6) {
       errors.password = 'Mật khẩu phải có độ dài tối thiểu 6 ký tự';
     }
 
-    // 4. Kiểm tra Xác nhận mật khẩu
     if (!confirmPassword) {
       errors.confirmPassword = 'Vui lòng xác nhận lại mật khẩu';
     } else if (password !== confirmPassword) {
@@ -64,9 +54,6 @@ function RegisterForm() {
     return Object.keys(errors).length === 0;
   };
 
-  /**
-   * Xử lý gửi biểu mẫu Đăng ký
-   */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError(null);
@@ -116,7 +103,6 @@ function RegisterForm() {
 
   return (
     <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-stone-200/90 p-8">
-      {/* Nút quay lại trang hiển thị sản phẩm */}
       <div className="mb-5">
         <Link
           href="/"
@@ -127,7 +113,6 @@ function RegisterForm() {
         </Link>
       </div>
 
-      {/* Header */}
       <div className="text-center mb-6">
         <Link href="/" className="inline-flex items-center gap-2 text-2xl font-black tracking-tight text-amber-900">
           <div className="bg-amber-600 text-white p-2 rounded-xl shadow-xs">
@@ -141,7 +126,6 @@ function RegisterForm() {
         </p>
       </div>
 
-      {/* Thông báo thành công */}
       {successMessage && (
         <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
           <span className="text-lg">✓</span>
@@ -149,7 +133,6 @@ function RegisterForm() {
         </div>
       )}
 
-      {/* Thông báo lỗi tổng quát */}
       {generalError && (
         <div className="mb-5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-2">
           <span className="font-bold text-base leading-none">⚠️</span>
@@ -158,7 +141,6 @@ function RegisterForm() {
       )}
 
       <form onSubmit={handleRegister} className="space-y-4" noValidate>
-        {/* Họ và tên */}
         <div>
           <label className="block text-xs font-semibold text-stone-700 mb-1">
             Họ và tên <span className="text-rose-500">*</span>

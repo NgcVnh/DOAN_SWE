@@ -34,7 +34,6 @@ interface CartState {
   clearCart: () => void;
 }
 
-// Hàm tự động tính tổng tiền và số lượng cho badge theo Task 5
 const computeTotals = (items: CartItem[]) => {
   const totalAmount = items.reduce(
     (sum, item) => sum + (item.lineTotal || item.unitPrice * item.qty),
@@ -57,12 +56,10 @@ export const useCartStore = create<CartState>()(
         set({ totalAmount, badgeCount });
       },
 
-      // 1. Thêm món vào giỏ hàng
       addToCart: (payload) => {
         const currentItems = get().items;
         const toppings = payload.toppings || [];
 
-        // Tìm món trùng productId, size và topping
         const existingIndex = currentItems.findIndex(
           (item) =>
             item.productId === payload.productId &&
@@ -115,7 +112,6 @@ export const useCartStore = create<CartState>()(
         set({ items: updatedItems, totalAmount, badgeCount });
       },
 
-      // 2. Sửa số lượng món trong giỏ
       updateQty: (cartItemId, qty) => {
         if (qty <= 0) {
           get().removeItem(cartItemId);
@@ -136,14 +132,12 @@ export const useCartStore = create<CartState>()(
         set({ items: updatedItems, totalAmount, badgeCount });
       },
 
-      // 3. Xóa món khỏi giỏ hàng
       removeItem: (cartItemId) => {
         const updatedItems = get().items.filter((item) => item.id !== cartItemId);
         const { totalAmount, badgeCount } = computeTotals(updatedItems);
         set({ items: updatedItems, totalAmount, badgeCount });
       },
 
-      // 4. Xóa toàn bộ giỏ hàng
       clearCart: () => {
         set({ items: [], totalAmount: 0, badgeCount: 0 });
       },

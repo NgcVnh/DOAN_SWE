@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 
@@ -10,5 +10,5 @@ export class PaymentsController {
   async createPayment(@Body() dto: CreatePaymentDto) {
     return this.paymentsService.processPayment(dto);
   }
-}
 
+}

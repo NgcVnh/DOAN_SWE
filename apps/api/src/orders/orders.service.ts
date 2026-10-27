@@ -4,6 +4,9 @@ import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
 import { Order } from './entities/order.entity.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertTransition } from './order-state-machine.js';
+import { PromotionsService } from '../promotions/promotions.service.js';
+import { LoyaltyPointsService } from '../promotions/loyalty.service.js';
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [
@@ -26,22 +29,16 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 @Injectable()
 export class OrdersService {
   private readonly orders: Order[] = [];
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotionsService: PromotionsService,
+    private readonly loyaltyService: LoyaltyPointsService,
+  ) {}
 
   async createOrder(
     createOrderDto: CreateOrderDto,
     userId: string | number = '0',
   ): Promise<Order> {
-    const totalAmount = createOrderDto.items.reduce((sum, item) => {
-      let itemPrice = 35000;
-      if (item.size === DrinkSize.M) itemPrice += 5000;
-      if (item.size === DrinkSize.L) itemPrice += 10000;
-      if (item.toppings && item.toppings.length > 0) {
-        itemPrice += item.toppings.length * 5000;
-      }
-      return sum + itemPrice * item.quantity;
-    }, 0);
-
     const parsedUserId = Number(userId);
     if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
       throw new BadRequestException('Tài khoản người dùng không hợp lệ');
@@ -62,29 +59,90 @@ export class OrdersService {
         throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
       }
 
+      // Tính tổng tiền sản phẩm (subtotal) dựa trên giá chuẩn từ database
+      let calculatedSubtotal = 0;
+      const orderItemsData = createOrderDto.items.map((item) => {
+        const productId = Number(item.productId);
+        const basePrice = prices.get(productId);
+        if (basePrice === undefined) {
+          throw new BadRequestException(`Không tìm thấy sản phẩm #${productId}`);
+        }
+        let unitPrice = basePrice;
+        if (item.size === DrinkSize.M) unitPrice += 5000;
+        if (item.size === DrinkSize.L) unitPrice += 10000;
+        if (item.toppings && item.toppings.length > 0) {
+          unitPrice += item.toppings.length * 5000;
+        }
+        const lineTotal = unitPrice * item.quantity;
+        calculatedSubtotal += lineTotal;
+        return {
+          productId,
+          size: item.size as ProductSize,
+          toppings: item.toppings || [],
+          unitPrice,
+          qty: item.quantity,
+          lineTotal,
+        };
+      });
+
+      // 1. Kiểm tra tài khoản người dùng
+      const user = await tx.user.findUnique({
+        where: { id: parsedUserId },
+        select: { id: true, loyaltyPoints: true },
+      });
+      if (!user) {
+        throw new NotFoundException(`Không tìm thấy tài khoản người dùng #${parsedUserId}`);
+      }
+
+      // 2. Nghiệp vụ Khuyến mãi (Task 10.3 - Strategy Pattern)
+      let promoDiscount = 0;
+      let appliedPromotionId: number | null = null;
+      if (createOrderDto.promoCode) {
+        const promoResult = await this.promotionsService.validateAndCalculate(
+          createOrderDto.promoCode,
+          calculatedSubtotal,
+        );
+        promoDiscount = promoResult.discountAmount;
+        appliedPromotionId = promoResult.promotion.id;
+      }
+
+      // 3. Nghiệp vụ Điểm thưởng (Task 10.3 - Loyalty Points)
+      const remainingAfterPromo = Math.max(0, calculatedSubtotal - promoDiscount);
+      let pointsDiscount = 0;
+      let pointsActuallyUsed = 0;
+      if (createOrderDto.pointsToUse && createOrderDto.pointsToUse > 0) {
+        const pointsResult = this.loyaltyService.calculatePointsDiscount(
+          createOrderDto.pointsToUse,
+          remainingAfterPromo,
+          user.loyaltyPoints,
+        );
+        pointsDiscount = pointsResult.discountAmount;
+        pointsActuallyUsed = pointsResult.pointsActuallyUsed;
+      }
+
+      const totalDiscount = promoDiscount + pointsDiscount;
+      const finalTotal = Math.max(0, calculatedSubtotal - totalDiscount);
+      const pointsEarned = this.loyaltyService.calculatePointsEarned(finalTotal);
+
+      // 4. Khấu trừ điểm và ghi nhận lượt dùng mã trong transaction (Atomicity)
+      if (pointsActuallyUsed > 0) {
+        await this.loyaltyService.deductPointsInTransaction(tx, parsedUserId, pointsActuallyUsed);
+      }
+      if (appliedPromotionId) {
+        await this.promotionsService.recordUsageInTransaction(tx, appliedPromotionId);
+      }
+
       return tx.order.create({
         data: {
           userId: parsedUserId,
+          promotionId: appliedPromotionId,
           status: PrismaOrderStatus.PENDING,
-          subtotal: totalAmount,
-          discountAmount: 0,
-          total: totalAmount,
+          subtotal: calculatedSubtotal,
+          discountAmount: totalDiscount,
+          total: finalTotal,
+          pointsEarned,
           items: {
-            create: createOrderDto.items.map((item) => {
-              const productId = Number(item.productId);
-              const unitPrice = prices.get(productId);
-              if (unitPrice === undefined) {
-                throw new BadRequestException(`Không tìm thấy sản phẩm #${productId}`);
-              }
-              return {
-                productId,
-                size: item.size as ProductSize,
-                toppings: item.toppings || [],
-                unitPrice,
-                qty: item.quantity,
-                lineTotal: unitPrice * item.quantity,
-              };
-            }),
+            create: orderItemsData,
           },
         },
         include: { items: true },
@@ -102,7 +160,10 @@ export class OrdersService {
         toppings: Array.isArray(item.toppings) ? (item.toppings as string[]) : [],
       })),
       status: createdOrder.status as OrderStatus,
+      subtotal: createdOrder.subtotal,
+      discountAmount: createdOrder.discountAmount,
       totalAmount: createdOrder.total,
+      pointsEarned: createdOrder.pointsEarned,
       promoCode: createOrderDto.promoCode,
       pointsToUse: createOrderDto.pointsToUse,
       createdAt: createdOrder.createdAt,
@@ -129,7 +190,10 @@ export class OrdersService {
             orderCode: `ORD-${o.id}`,
             userId: String(o.userId),
             status: o.status as any,
+            subtotal: o.subtotal,
+            discountAmount: o.discountAmount,
             totalAmount: o.total,
+            pointsEarned: o.pointsEarned,
             items: o.items.map((item) => ({
               productId: String(item.productId),
               quantity: item.qty,
@@ -167,7 +231,10 @@ export class OrdersService {
           orderCode: `ORD-${dbOrder.id}`,
           userId: String(dbOrder.userId),
           status: dbOrder.status as OrderStatus,
+          subtotal: dbOrder.subtotal,
+          discountAmount: dbOrder.discountAmount,
           totalAmount: dbOrder.total,
+          pointsEarned: dbOrder.pointsEarned,
           items: dbOrder.items.map((item) => ({
             productId: String(item.productId),
             quantity: item.qty,
@@ -196,12 +263,10 @@ export class OrdersService {
 
   async transitionOrderStatus(orderCode: string, nextStatus: OrderStatus): Promise<Order> {
     const order = await this.findByCode(orderCode);
-    const allowedNext = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowedNext.includes(nextStatus)) {
-      throw new BadRequestException(
-        `Không thể chuyển trạng thái đơn hàng từ "${order.status}" sang "${nextStatus}"`,
-      );
+    if (order.status === nextStatus) {
+      return order;
     }
+    assertTransition(order.status, nextStatus);
     const orderId = Number(order.id);
     if (Number.isInteger(orderId) && orderId > 0) {
       const updatedOrder = await this.prisma.order.update({

@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './../src/auth/guards/jwt-auth.guard.js';
 
 describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
   let app: INestApplication<App>;
+  let authToken: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -31,6 +32,14 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
       }),
     );
     await app.init();
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'customer@brewlite.vn', password: '123456' });
+
+    if (loginRes.body?.accessToken) {
+      authToken = loginRes.body.accessToken;
+    }
   });
 
   afterAll(async () => {
@@ -43,7 +52,7 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
     const payload = {
       items: [
         {
-          productId: 'prod-tra-sua-olong',
+          productId: '1',
           quantity: 2,
           size: 'M',
           toppings: ['Trân châu đen', 'Thạch phô mai'],
@@ -52,8 +61,12 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
       promoCode: 'GIAM10K',
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(201);
 
@@ -90,8 +103,12 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
       items: [],
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(400);
 
@@ -109,8 +126,12 @@ describe('OrdersController (e2e) - Task 10.2 Integration & Inventory', () => {
       ],
     };
 
-    const res = await request(app.getHttpServer())
-      .post('/orders')
+    const req = request(app.getHttpServer()).post('/orders');
+    if (authToken) {
+      req.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    const res = await req
       .send(payload)
       .expect(400);
 

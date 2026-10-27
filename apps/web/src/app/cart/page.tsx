@@ -17,7 +17,6 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-stone-50 pb-32">
-      {/* Top Header */}
       <div className="sticky top-0 z-40 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between">
         <Link href="/" className="p-2 -ml-2 rounded-full hover:bg-stone-100 text-stone-700">
           <ArrowLeft className="w-5 h-5" />
@@ -27,7 +26,6 @@ export default function CartPage() {
       </div>
 
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
-        {/* Nhắc nhở nếu chưa đăng nhập */}
         {!isLoggedIn && items.length > 0 && (
           <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-xs text-amber-900">
             <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />

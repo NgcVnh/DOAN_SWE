@@ -44,7 +44,6 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [product, setProduct] = useState<ProductDetailItem | null>(null);
 
-  // Lấy dữ liệu sản phẩm từ API Backend Task 2 (GET /products)
   useEffect(() => {
     let isMounted = true;
     const fetchProduct = async () => {
@@ -86,7 +85,6 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const { addToCart } = useCartStore();
 
-  // State tùy chọn theo Task 4: Size (S/M/L) và Topping
   const [size, setSize] = useState<ProductSize>('M');
   const [selectedToppings, setSelectedToppings] = useState<ToppingOption[]>([]);
   const [sweetness, setSweetness] = useState<SweetnessLevel>('100%');
@@ -95,7 +93,6 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [showToast, setShowToast] = useState<boolean>(false);
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
-  // Tính giá theo tùy chọn thời gian thực (Real-time pricing)
   const currentPrice = product?.price || 35000;
   const pricing = useMemo(() => {
     return calculateCustomizedPrice(currentPrice, size, selectedToppings, quantity);
@@ -115,7 +112,6 @@ export default function ProductDetailPage({ params }: PageProps) {
   const handleAddToCart = async () => {
     if (!product) return;
 
-    // Bắt buộc phải đăng nhập thì mới được thêm vào giỏ
     const currentUser = getStoredUser();
     if (!currentUser) {
       router.push(

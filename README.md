@@ -73,3 +73,14 @@ US-06-Xác nhận lịch sử đơn hàng
       Mỗi đơn hàng trong lịch sử hiển thị tối thiểu mã đơn hàng, tổng tiền, thời gian tạo và trạng thái đơn. 
       ếu khách hàng chưa có đơn hàng nào, hệ thống hiển thị thông báo lịch sử đơn hàng trống. 
       Khách hàng không được xem lịch sử đơn hàng của tài khoản khác. 
+
+UserStory 7: Xem menu sản phẩm
+
+US-07-Xem menu sản phẩm
+  Là một khách hàng tôi muốn xem danh sách đồ uống trên Brew Lite cùng với hình ảnh, tên và giá tiền để lựa chọn đồ uống trước khi đặt hàng
+    Tiêu chí chấp nhận (Acceptance Criteria):
+      Khi khách hàng truy cập trang menu, hệ thống hiển thị danh sách đồ uống 
+      Mỗi đồ uống hiển thị đầy đủ hình ảnh, tên và giá tiền 
+      Hệ thống lấy danh sách đồ uống từ API backend
+      Nếu không có đồ uống thì hiển thị thông báo danh sách trống
+

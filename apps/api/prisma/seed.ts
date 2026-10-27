@@ -1,16 +1,12 @@
-import { PrismaClient } from '@prisma/client';
 
-enum DiscountType {
-  PERCENTAGE = 'PERCENTAGE',
-  FIXED = 'FIXED',
-}
+import { PrismaClient, DiscountType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding BrewLite initial data...');
 
-  // 1. Seed Products
   const products = [
     {
       name: 'Cà phê sữa đá',
@@ -61,7 +57,6 @@ async function main() {
     }
   }
 
-  // 2. Seed Toppings
   const toppings = [
     { name: 'Trân châu đen', price: 10000, isAvailable: true },
     { name: 'Trân châu trắng', price: 10000, isAvailable: true },
@@ -76,7 +71,6 @@ async function main() {
     }
   }
 
-  // 3. Seed Promotions
   const promotions = [
     {
       code: 'BREWLITE20',
@@ -86,7 +80,7 @@ async function main() {
       maxDiscount: 30000,
       usageLimit: 100,
       isActive: true,
-      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days later
+      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 
     },
     {
       code: 'GIAM10K',
@@ -107,21 +101,21 @@ async function main() {
     }
   }
 
-  // 4. Seed Demo User (password is '123456')
   const demoEmail = 'customer@brewlite.vn';
-  const existingUser = await prisma.user.findUnique({ where: { email: demoEmail } });
-  if (!existingUser) {
-    await prisma.user.create({
-      data: {
-        email: demoEmail,
-        fullName: 'Khách hàng Thử Nghiệm',
-        passwordHash: '$2b$10$EP0.P2e43mIu8y6Gq8iK1O6e9mG4Vn7pA8u8p6pB8q3oP2r0nK9mC', // hash của 123456
-        loyaltyPoints: 100,
-      },
-    });
-  }
+  const realPasswordHash = await bcrypt.hash('123456', 10);
+  await prisma.user.upsert({
+    where: { email: demoEmail },
+    update: {
+      passwordHash: realPasswordHash,
+    },
+    create: {
+      email: demoEmail,
+      fullName: 'Khách hàng Thử Nghiệm',
+      passwordHash: realPasswordHash,
+      loyaltyPoints: 100,
+    },
+  });
 
-  // 5. Seed Demo Order (Pending) for Checkout test
   const existingOrder = await prisma.order.findUnique({ where: { id: 1 } });
   if (!existingOrder) {
     const demoUser = await prisma.user.findUnique({ where: { email: demoEmail } });
@@ -139,6 +133,10 @@ async function main() {
       });
     }
   }
+
+  await prisma.$executeRawUnsafe(
+    `SELECT setval(pg_get_serial_sequence('orders', 'id'), COALESCE((SELECT MAX(id) FROM orders), 1));`
+  );
 
   console.log('Seeding completed successfully!');
 }

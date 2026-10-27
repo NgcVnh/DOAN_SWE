@@ -1,10 +1,5 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
-/**
- * [OOP - Data Transfer Object]
- * RegisterDto đóng gói dữ liệu đăng ký tài khoản từ client.
- * Áp dụng class-validator để xác thực dữ liệu đầu vào theo chính sách nghiệp vụ.
- */
 export class RegisterDto {
   @IsEmail({}, { message: 'Định dạng email không hợp lệ' })
   @IsNotEmpty({ message: 'Email không được để trống' })

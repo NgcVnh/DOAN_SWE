@@ -19,6 +19,7 @@ import {
 import { Header } from '../../../components/Header';
 import { useCartStore } from '../../../store/useCartStore';
 import { COFFEE_TOPPINGS } from '../../../data/coffeeProducts';
+import { getAuthToken } from '../../../lib/auth';
 import {
   OrderView,
   OrderStatusType,
@@ -85,11 +86,15 @@ export default function OrderDetailPage(): React.JSX.Element {
     setActionError(null);
 
     try {
+      const token = getAuthToken();
       const response = await fetch(
         `${apiUrl}/orders/${encodeURIComponent(order.orderCode)}/status`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ status: 'CANCELLED' as OrderStatusType }),
         },
       );

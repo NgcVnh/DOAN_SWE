@@ -6,7 +6,7 @@ export enum OrderStatus {
   COMPLETED = 'COMPLETED',
   PAYMENT_FAILED = 'PAYMENT_FAILED',
   CANCELLED = 'CANCELLED',
-  CANCELED = 'CANCELLED', // Alias tương thích
+  CANCELED = 'CANCELLED', 
 }
 
 export enum DrinkSize {

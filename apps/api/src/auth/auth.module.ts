@@ -7,10 +7,6 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 
-/**
- * [OOP - Module Encapsulation]
- * AuthModule đóng gói toàn bộ tính năng xác thực JWT, Passport và Controller/Service liên quan.
- */
 @Module({
   imports: [
     PrismaModule,
@@ -18,7 +14,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'brewlite_jwt_secret_key_2026',
       signOptions: {
-        expiresIn: '1d', // Token hết hạn sau 1 ngày (24 giờ)
+        expiresIn: '1d', 
       },
     }),
   ],

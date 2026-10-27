@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { OrdersModule } from './orders/orders.module.js';
+import { PromotionsModule } from './promotions/promotions.module.js';
 
 export const {
   ObserveModule,
@@ -25,6 +26,7 @@ export const {
     PaymentsModule,
     AuthModule,
     OrdersModule,
+    PromotionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
