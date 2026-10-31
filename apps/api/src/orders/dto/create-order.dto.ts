@@ -28,6 +28,11 @@ export class CreateOrderItemDto {
   @IsArray()
   @IsString({ each: true })
   toppings?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  unitPrice?: number;
 }
 
 export class CreateOrderDto {

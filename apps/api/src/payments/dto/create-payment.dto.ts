@@ -16,5 +16,12 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsBoolean()
   mockSuccess?: boolean;
-}
 
+  @IsOptional()
+  @IsBoolean()
+  useSandbox?: boolean;
+
+  @IsOptional()
+  @IsString()
+  ipAddr?: string;
+}

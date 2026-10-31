@@ -40,7 +40,7 @@ export interface OrderStatusMeta {
   description: string;
   badgeClass: string;
   dotClass: string;
-  stepIndex: number; 
+  stepIndex: number;
   nextDemoStatus?: OrderStatusType;
   nextDemoLabel?: string;
   canCancel: boolean;

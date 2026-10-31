@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Clock,
-  CheckCircle2,
   AlertTriangle,
   XCircle,
   RefreshCw,
@@ -154,7 +153,6 @@ export default function OrderDetailPage(): React.JSX.Element {
       <Header />
 
       <main className="max-w-md mx-auto md:max-w-2xl px-4 py-6 sm:py-8 flex-1 w-full space-y-5">
-        {/* Thanh điều hướng quay lại */}
         <div className="flex items-center justify-between">
           <Link
             href="/orders"
@@ -203,7 +201,6 @@ export default function OrderDetailPage(): React.JSX.Element {
 
         {!loading && !error && order && meta && (
           <>
-            {/* Khối thông tin trạng thái & Mã đơn */}
             <section className="bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 pb-4">
                 <div>
@@ -227,7 +224,6 @@ export default function OrderDetailPage(): React.JSX.Element {
                 </span>
               </div>
 
-              {/* Timeline 5 bước của Order State Machine */}
               {meta.stepIndex >= 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-stone-700">
@@ -315,7 +311,6 @@ export default function OrderDetailPage(): React.JSX.Element {
               )}
             </section>
 
-            {/* Danh sách sản phẩm trong đơn */}
             <section className="bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs space-y-4">
               <h2 className="text-sm font-bold text-stone-900 flex items-center gap-2 border-b border-stone-100 pb-3">
                 <Coffee className="w-4 h-4 text-amber-600" />
@@ -365,7 +360,6 @@ export default function OrderDetailPage(): React.JSX.Element {
                 ))}
               </div>
 
-              {/* Tổng kết hóa đơn */}
               <div className="pt-3 border-t border-stone-200 space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between text-stone-600">
                   <span className="flex items-center gap-1.5">
@@ -394,7 +388,6 @@ export default function OrderDetailPage(): React.JSX.Element {
               </div>
             </section>
 
-            {/* Các nút hành động cuối trang */}
             <div className="flex flex-wrap items-center gap-3">
               {meta.canRetryPayment && (
                 <Link
