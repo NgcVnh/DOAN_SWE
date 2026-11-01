@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { assertTransition } from './order-state-machine.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
 import { LoyaltyPointsService } from '../promotions/loyalty.service.js';
+import { calculateSugarAndIceConsumption } from '../products/sugar-ice.calculator.js';
+import { ProductsService } from '../products/products.service.js';
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [
@@ -57,6 +59,42 @@ export class OrdersService {
       const prices = new Map(products.map((product) => [product.id, product.price]));
       if (products.length !== new Set(productIds).size) {
         throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
+      }
+
+      // 1. Kiểm tra tồn kho nguyên liệu Đường & Đá
+      const consumption = calculateSugarAndIceConsumption(
+        createOrderDto.items.map((item) => ({
+          size: item.size,
+          sweetness: item.sweetness,
+          ice: item.ice,
+          qty: item.quantity,
+        })),
+      );
+
+      // Lấy tồn kho đường & đá từ DB (hoặc fallback in-memory)
+      let availableSugar = ProductsService.getInMemoryIngredientStock('SUGAR');
+      let availableIce = ProductsService.getInMemoryIngredientStock('ICE');
+      try {
+        if ((tx as any)?.ingredient?.findUnique) {
+          const sugarRecord = await (tx as any).ingredient.findUnique({ where: { code: 'SUGAR' } });
+          const iceRecord = await (tx as any).ingredient.findUnique({ where: { code: 'ICE' } });
+          if (sugarRecord) availableSugar = sugarRecord.stock;
+          if (iceRecord) availableIce = iceRecord.stock;
+        }
+      } catch {
+        // Fallback in-memory
+      }
+
+      if (consumption.totalSugarGrams > 0 && availableSugar < consumption.totalSugarGrams) {
+        throw new BadRequestException(
+          `Kho nguyên liệu không đủ đường để pha chế (còn ${Math.max(0, Math.floor(availableSugar))}g, cần ${consumption.totalSugarGrams}g). Vui lòng chọn mức đường khác hoặc liên hệ quán!`,
+        );
+      }
+
+      if (consumption.totalIceGrams > 0 && availableIce < consumption.totalIceGrams) {
+        throw new BadRequestException(
+          `Kho nguyên liệu không đủ đá để pha chế (còn ${Math.max(0, Math.floor(availableIce))}g, cần ${consumption.totalIceGrams}g). Vui lòng chọn Không đá hoặc liên hệ quán!`,
+        );
       }
 
       let calculatedSubtotal = 0;

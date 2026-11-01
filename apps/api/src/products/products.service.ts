@@ -148,4 +148,11 @@ export class ProductsService {
     return ing ? ing.stock : 999999;
   }
 
+  static setInMemoryIngredientStock(code: 'SUGAR' | 'ICE', newStock: number) {
+    const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
+    if (ing) {
+      ing.stock = Math.max(0, newStock);
+    }
+  }
+
 }

@@ -10,6 +10,14 @@ export interface ToppingOption {
   stock?: number;
 }
 
+export interface IngredientOption {
+  code: 'SUGAR' | 'ICE' | string;
+  name: string;
+  stock: number;
+  unit: string;
+  isAvailable: boolean;
+}
+
 export interface ProductDetailItem {
   id: number;
   name: string;

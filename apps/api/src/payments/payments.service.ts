@@ -108,20 +108,32 @@ export class PaymentsService {
         ProductsService.deductInMemoryIngredientStock('ICE', consumption.totalIceGrams);
       }
 
-      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại
+      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (bảo đảm stock >= 0 không bị âm)
       try {
-        if ((this.prisma as any)?.ingredient?.updateMany) {
+        if ((this.prisma as any)?.ingredient) {
           if (consumption.totalSugarGrams > 0) {
-            await (this.prisma as any).ingredient.updateMany({
+            const currentSugar = await (this.prisma as any).ingredient.findUnique({
               where: { code: 'SUGAR' },
-              data: { stock: { decrement: consumption.totalSugarGrams } },
             });
+            if (currentSugar) {
+              const newSugarStock = Math.max(0, Math.round((currentSugar.stock - consumption.totalSugarGrams) * 10) / 10);
+              await (this.prisma as any).ingredient.update({
+                where: { code: 'SUGAR' },
+                data: { stock: newSugarStock },
+              });
+            }
           }
           if (consumption.totalIceGrams > 0) {
-            await (this.prisma as any).ingredient.updateMany({
+            const currentIce = await (this.prisma as any).ingredient.findUnique({
               where: { code: 'ICE' },
-              data: { stock: { decrement: consumption.totalIceGrams } },
             });
+            if (currentIce) {
+              const newIceStock = Math.max(0, Math.round((currentIce.stock - consumption.totalIceGrams) * 10) / 10);
+              await (this.prisma as any).ingredient.update({
+                where: { code: 'ICE' },
+                data: { stock: newIceStock },
+              });
+            }
           }
         }
       } catch (dbErr) {

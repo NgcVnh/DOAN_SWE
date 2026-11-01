@@ -16,6 +16,29 @@ export const SIZE_PRICES: Record<ProductSize, number> = {
 export const SWEETNESS_OPTIONS: SweetnessLevel[] = ['0%', '30%', '50%', '70%', '100%'];
 
 export const ICE_OPTIONS: IceLevel[] = ['Không đá', 'Ít đá', 'Bình thường'];
+// Định mức đường và đá chuẩn theo size (đơn vị: gram)
+export const SIZE_STANDARDS: Record<ProductSize, { sugar: number; ice: number }> = {
+  S: { sugar: 30, ice: 150 },
+  M: { sugar: 35, ice: 200 },
+  L: { sugar: 40, ice: 250 },
+};
+
+// Hệ số mức đường
+export const SWEETNESS_FACTORS: Record<SweetnessLevel, number> = {
+  '0%': 0.0,
+  '30%': 0.3,
+  '50%': 0.5,
+  '70%': 0.7,
+  '100%': 1.0,
+};
+
+// Hệ số mức đá
+export const ICE_FACTORS: Record<IceLevel, number> = {
+  'Không đá': 0.0,
+  'Ít đá': 0.5,
+  'Bình thường': 1.0,
+};
+
 
 export const COFFEE_TOPPINGS: ToppingOption[] = [
   { id: 1, name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
