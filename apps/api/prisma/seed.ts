@@ -58,16 +58,31 @@ async function main() {
   }
 
   const toppings = [
-    { name: 'Trân châu đen', price: 10000, isAvailable: true },
-    { name: 'Trân châu trắng', price: 10000, isAvailable: true },
-    { name: 'Kem Cheese', price: 12000, isAvailable: true },
-    { name: 'Thạch nha đam', price: 8000, isAvailable: true },
+    { name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
+    { name: 'Trân châu trắng', price: 10000, stock: 0, isAvailable: false },
+    { name: 'Kem Cheese', price: 12000, stock: 8, isAvailable: true },
+    { name: 'Thạch nha đam', price: 8000, stock: 20, isAvailable: true },
   ];
 
   for (const t of toppings) {
     const existing = await prisma.topping.findFirst({ where: { name: t.name } });
     if (!existing) {
       await prisma.topping.create({ data: t });
+    }
+  }
+
+  // Khởi tạo kho nguyên liệu: Đường & Đá (đơn vị: gram)
+  const ingredients = [
+    { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 }, // 20 kg
+    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },    // 50 kg
+  ];
+
+  for (const ing of ingredients) {
+    const existing = await prisma.ingredient.findUnique({
+      where: { code: ing.code },
+    });
+    if (!existing) {
+      await prisma.ingredient.create({ data: ing });
     }
   }
 

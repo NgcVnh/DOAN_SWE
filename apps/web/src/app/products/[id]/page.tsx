@@ -43,6 +43,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [product, setProduct] = useState<ProductDetailItem | null>(null);
+  const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,7 +78,22 @@ export default function ProductDetailPage({ params }: PageProps) {
       }
     };
 
+    const fetchToppings = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' });
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0 && isMounted) {
+            setToppingsList(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Không thể tải topping từ backend, dùng fallback:', err);
+      }
+    };
+
     fetchProduct();
+    fetchToppings();
     return () => {
       isMounted = false;
     };
@@ -99,6 +115,9 @@ export default function ProductDetailPage({ params }: PageProps) {
   }, [currentPrice, size, selectedToppings, quantity]);
 
   const handleToggleTopping = (topping: ToppingOption) => {
+    const isOutOfStock = topping.stock !== undefined ? topping.stock <= 0 : topping.isAvailable === false;
+    if (isOutOfStock) return;
+
     setSelectedToppings((prev) => {
       const exists = prev.some((t) => t.id === topping.id);
       if (exists) {
@@ -127,6 +146,8 @@ export default function ProductDetailPage({ params }: PageProps) {
       name: product.name,
       unitPrice: pricing.unitPrice,
       size,
+      sweetness,
+      ice,
       qty: quantity,
       toppings: selectedToppings,
     });
@@ -262,33 +283,53 @@ export default function ProductDetailPage({ params }: PageProps) {
           </div>
 
           <div className="space-y-2">
-            {COFFEE_TOPPINGS.map((topping) => {
+            {toppingsList.map((topping) => {
               const isChecked = selectedToppings.some((t) => t.id === topping.id);
+              const isOutOfStock = topping.stock !== undefined ? topping.stock <= 0 : topping.isAvailable === false;
+              const remainingStock = topping.stock !== undefined ? topping.stock : (topping.isAvailable ? 10 : 0);
+
               return (
                 <div
                   key={topping.id}
                   onClick={() => handleToggleTopping(topping)}
-                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition select-none ${
-                    isChecked
-                      ? 'border-amber-700 bg-amber-50/60'
-                      : 'border-stone-200 hover:bg-stone-50 bg-white'
+                  className={`flex items-center justify-between p-3 rounded-xl border transition select-none ${
+                    isOutOfStock
+                      ? 'border-stone-200 bg-stone-100/80 opacity-60 cursor-not-allowed'
+                      : isChecked
+                      ? 'border-amber-700 bg-amber-50/60 cursor-pointer shadow-sm'
+                      : 'border-stone-200 hover:bg-stone-50 bg-white cursor-pointer'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-4 h-4 rounded border flex items-center justify-center transition ${
-                        isChecked
+                        isOutOfStock
+                          ? 'border-stone-300 bg-stone-200 text-transparent'
+                          : isChecked
                           ? 'bg-amber-700 border-amber-700 text-white'
                           : 'border-stone-300 bg-white'
                       }`}
                     >
-                      {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                      {isChecked && !isOutOfStock && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
-                    <span className="text-xs font-medium text-stone-800">
-                      {topping.name}
-                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${isOutOfStock ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
+                          {topping.name}
+                        </span>
+                        {isOutOfStock ? (
+                          <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">
+                            Hết hàng
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-full">
+                            Còn lại: {remainingStock}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-amber-900">
+                  <span className={`text-xs font-bold ${isOutOfStock ? 'text-stone-400' : 'text-amber-900'}`}>
                     +{topping.price.toLocaleString('vi-VN')} đ
                   </span>
                 </div>

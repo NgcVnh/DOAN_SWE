@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStoredUser } from '@/lib/auth';
 import { X, Plus, Minus, Check, Coffee, Sparkles } from 'lucide-react';
@@ -41,6 +41,30 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   const [quantity, setQuantity] = useState<number>(1);
   const [specialNote, setSpecialNote] = useState<string>('');
   const [addedToast, setAddedToast] = useState<boolean>(false);
+  const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchToppings = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' });
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0 && isMounted) {
+            setToppingsList(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Không thể tải topping từ backend trong modal, dùng fallback:', err);
+      }
+    };
+    fetchToppings();
+    return () => {
+      isMounted = false;
+    };
+  }, [apiUrl]);
 
   const pricing = useMemo(() => {
     if (!product) return null;
@@ -75,6 +99,8 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
     await addToCart({
       productId: product.id,
       size,
+      sweetness,
+      ice,
       qty: quantity,
       toppings: selectedToppings,
     });

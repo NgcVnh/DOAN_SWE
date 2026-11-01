@@ -81,6 +81,8 @@ export class OrdersService {
         return {
           productId,
           size: item.size as ProductSize,
+          sweetness: item.sweetness || '100%',
+          ice: item.ice || 'Bình thường',
           toppings: item.toppings || [],
           unitPrice,
           qty: item.quantity,

@@ -10,4 +10,14 @@ export class ProductsController {
   async findAll(): Promise<Products[]> {
     return this.productsService.findAll();
   }
+
+  @Get('toppings')
+  async findAllToppings() {
+    return this.productsService.findAllToppings();
+  }
+
+  @Get('ingredients')
+  async findAllIngredients() {
+    return this.productsService.findAllIngredients();
+  }
 }

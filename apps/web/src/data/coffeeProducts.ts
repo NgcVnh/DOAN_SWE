@@ -18,10 +18,10 @@ export const SWEETNESS_OPTIONS: SweetnessLevel[] = ['0%', '30%', '50%', '70%', '
 export const ICE_OPTIONS: IceLevel[] = ['Không đá', 'Ít đá', 'Bình thường'];
 
 export const COFFEE_TOPPINGS: ToppingOption[] = [
-  { id: 1, name: 'Trân châu đen', price: 10000, isAvailable: true },
-  { id: 2, name: 'Trân châu trắng', price: 10000, isAvailable: true },
-  { id: 3, name: 'Kem Cheese', price: 12000, isAvailable: true },
-  { id: 4, name: 'Thạch nha đam', price: 8000, isAvailable: true },
+  { id: 1, name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
+  { id: 2, name: 'Trân châu trắng', price: 10000, stock: 0, isAvailable: false },
+  { id: 3, name: 'Kem Cheese', price: 12000, stock: 8, isAvailable: true },
+  { id: 4, name: 'Thạch nha đam', price: 8000, stock: 20, isAvailable: true },
 ];
 
 export const COFFEE_PRODUCTS: ProductDetailItem[] = [

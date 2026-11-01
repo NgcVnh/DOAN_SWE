@@ -7,6 +7,8 @@ export interface CartItem {
   productId: number;
   name: string;
   size: 'S' | 'M' | 'L';
+  sweetness?: string;
+  ice?: string;
   toppings: Array<{ id: number; name: string; price: number }>;
   unitPrice: number;
   qty: number;
@@ -18,6 +20,8 @@ export interface AddToCartPayload {
   name?: string;
   unitPrice?: number;
   size: 'S' | 'M' | 'L';
+  sweetness?: string;
+  ice?: string;
   qty: number;
   toppings?: Array<{ id: number; name: string; price: number }>;
 }
@@ -59,11 +63,15 @@ export const useCartStore = create<CartState>()(
       addToCart: (payload) => {
         const currentItems = get().items;
         const toppings = payload.toppings || [];
+        const sweetness = payload.sweetness || '100%';
+        const ice = payload.ice || 'Bình thường';
 
         const existingIndex = currentItems.findIndex(
           (item) =>
             item.productId === payload.productId &&
             item.size === payload.size &&
+            (item.sweetness || '100%') === sweetness &&
+            (item.ice || 'Bình thường') === ice &&
             JSON.stringify(item.toppings?.map((t) => t.id).sort()) ===
               JSON.stringify(toppings.map((t) => t.id).sort()),
         );
@@ -100,6 +108,8 @@ export const useCartStore = create<CartState>()(
             productId: payload.productId,
             name,
             size: payload.size,
+            sweetness,
+            ice,
             toppings,
             unitPrice,
             qty: payload.qty,

@@ -7,6 +7,7 @@ export interface ToppingOption {
   name: string;
   price: number;
   isAvailable?: boolean;
+  stock?: number;
 }
 
 export interface ProductDetailItem {

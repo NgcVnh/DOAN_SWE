@@ -73,9 +73,23 @@ model Topping {
   id          Int     @id @default(autoincrement())
   name        String
   price       Int
+  stock       Int     @default(0)
   isAvailable Boolean @default(true)
 
   @@map("toppings")
+}
+
+model Ingredient {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique // 'SUGAR', 'ICE'
+  name         String   // 'Đường cát', 'Đá viên'
+  stock        Float    @default(0) // Số lượng tồn kho đơn vị gam (g)
+  unit         String   @default("g") // 'g'
+  minThreshold Float    @default(1000) // Ngưỡng cảnh báo sắp hết (1kg)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("ingredients")
 }
 
 model Promotion {
@@ -119,6 +133,8 @@ model OrderItem {
   orderId   Int
   productId Int
   size      ProductSize
+  sweetness String?     @default("100%") // Khẩu vị đường: 0%, 30%, 50%, 70%, 100%
+  ice       String?     @default("Bình thường") // Lượng đá: Không đá, Ít đá, Bình thường
   toppings  Json        @default("[]") // Lưu danh sách topping kèm giá
   unitPrice Int
   qty       Int
@@ -137,7 +153,6 @@ model Payment {
   amount         Int
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
-  mockSuccess Boolean @default(true)
   transactionRef String?
   createdAt      DateTime      @default(now())
 

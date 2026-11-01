@@ -40,7 +40,24 @@ export class WalletPaymentStrategy extends PaymentStrategy {
     context?: PaymentContext,
   ): Promise<GatewayResponse> {
     if (context?.useSandbox) {
-      return this.createZaloPayOrder(amount, context);
+      try {
+        const zaloResult = await this.createZaloPayOrder(amount, context);
+        if (zaloResult.success && zaloResult.paymentUrl) {
+          return zaloResult;
+        }
+        // Nếu API ZaloPay trả về lỗi (hoặc offline), fallback mock thành công nếu mockSuccess = true
+        if (!mockSuccess) {
+          return zaloResult;
+        }
+      } catch (error) {
+        // Lỗi kết nối mạng hoặc endpoint Sandbox ZaloPay lỗi
+        if (!mockSuccess) {
+          return {
+            success: false,
+            errorMessage: 'Không thể kết nối đến cổng ZaloPay Sandbox: ' + ((error as Error)?.message || ''),
+          };
+        }
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 150));
