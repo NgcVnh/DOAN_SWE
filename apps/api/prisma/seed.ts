@@ -1,4 +1,3 @@
-
 import { PrismaClient, DiscountType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -116,21 +115,6 @@ async function main() {
     }
   }
 
-  // Khởi tạo kho nguyên liệu: Đường & Đá (đơn vị: gram)
-  const ingredients = [
-    { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 }, // 20 kg
-    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },    // 50 kg
-  ];
-
-  for (const ing of ingredients) {
-    const existing = await prisma.ingredient.findUnique({
-      where: { code: ing.code },
-    });
-    if (!existing) {
-      await prisma.ingredient.create({ data: ing });
-    }
-  }
-
   const promotions = [
     {
       code: 'BREWLITE20',
@@ -209,4 +193,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
