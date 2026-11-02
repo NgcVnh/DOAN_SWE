@@ -185,6 +185,8 @@ function CheckoutContent(): React.JSX.Element {
           productId: String(item.productId),
           quantity: item.qty,
           size: item.size,
+          sweetness: item.sweetness || '100%',
+          ice: item.ice || 'Bình thường',
           toppings: item.toppings?.map((t) => t.name) ?? [],
           unitPrice: item.unitPrice,
         }));

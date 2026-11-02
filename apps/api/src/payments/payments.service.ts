@@ -6,6 +6,8 @@ import { PaymentStrategy } from './strategies/payment-strategy.interface.js';
 import { WalletPaymentStrategy } from './strategies/wallet-payment.strategy.js';
 import { CardPaymentStrategy } from './strategies/card-payment.strategy.js';
 import { VnpayPaymentStrategy } from './strategies/vnpay-payment.strategy.js';
+import { ProductsService } from '../products/products.service.js';
+import { calculateSugarAndIceConsumption } from '../products/sugar-ice.calculator.js';
 
 @Injectable()
 export class PaymentsService {
@@ -22,6 +24,156 @@ export class PaymentsService {
       [PaymentMethod.CARD]: this.cardStrategy,
       [PaymentMethod.VNPAY]: this.vnpayStrategy,
     };
+  }
+
+
+  private async deductProductStock(orderId: number) {
+    try {
+      const orderWithItems = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!orderWithItems || !orderWithItems.items) return;
+
+      for (const item of orderWithItems.items) {
+        try {
+          const product = await this.prisma.product.findUnique({
+            where: { id: item.productId },
+          });
+          if (product) {
+            const newStock = Math.max(0, product.stock - Number(item.qty || 1));
+            await this.prisma.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: newStock,
+                isAvailable: newStock > 0,
+              },
+            });
+          }
+        } catch (dbErr) {
+          console.warn(`Không thể trừ tồn kho DB cho sản phẩm #${item.productId}:`, dbErr);
+        }
+      }
+    } catch (err) {
+      console.warn('Không thể trừ tồn kho sản phẩm:', err);
+    }
+  }
+
+  private async deductToppingStock(orderId: number) {
+    try {
+      // Dùng this.prisma trực tiếp (KHÔNG dùng tx) để tránh lỗi 25P02 khi transaction bị abort
+      const orderWithItems = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!orderWithItems || !orderWithItems.items) return;
+
+      const toppingCounts = new Map<string, number>();
+      for (const item of orderWithItems.items) {
+        const itemQty = Number(item.qty || 1);
+        if (Array.isArray(item.toppings)) {
+          for (const t of item.toppings as any[]) {
+            const toppingName = typeof t === 'string' ? t : t?.name;
+            if (toppingName && typeof toppingName === 'string') {
+              toppingCounts.set(toppingName, (toppingCounts.get(toppingName) || 0) + itemQty);
+            }
+          }
+        }
+      }
+
+      for (const [toppingName, count] of toppingCounts.entries()) {
+        // Luôn trừ in-memory trước (không phụ thuộc DB)
+        ProductsService.deductInMemoryToppingStock(toppingName, count);
+
+        // Trừ DB với try/catch riêng — lỗi DB không được làm hỏng luồng thanh toán
+        try {
+          const existingTopping = await this.prisma.topping.findFirst({
+            where: { name: { equals: toppingName, mode: 'insensitive' } },
+          });
+          if (existingTopping) {
+            const newStock = Math.max(0, existingTopping.stock - count);
+            await this.prisma.topping.update({
+              where: { id: existingTopping.id },
+              data: {
+                stock: newStock,
+                isAvailable: newStock > 0,
+              },
+            });
+          }
+        } catch (dbErr) {
+          console.warn(`Không thể trừ tồn kho DB cho topping "${toppingName}":`, dbErr);
+          // Tiếp tục — in-memory đã được trừ, lỗi DB không làm gián đoạn
+        }
+      }
+    } catch (err) {
+      console.warn('Không thể trừ tồn kho topping:', err);
+    }
+  }
+
+  /**
+   * Khấu trừ lượng đường và lượng đá dựa trên công thức chuẩn và khẩu vị của khách:
+   * sugarused = sugarstandarsize * sugarlevel
+   * iceused = icestandersize * icelevel
+   */
+  private async deductSugarAndIceStock(orderId: number) {
+    try {
+      const orderWithItems = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!orderWithItems || !orderWithItems.items || orderWithItems.items.length === 0) return;
+
+      const consumption = calculateSugarAndIceConsumption(
+        orderWithItems.items.map((item: any) => ({
+          size: item.size,
+          sweetness: item.sweetness,
+          ice: item.ice,
+          qty: item.qty,
+        })),
+      );
+
+      // 1. Luôn trừ in-memory trước (fallback)
+      if (consumption.totalSugarGrams > 0) {
+        ProductsService.deductInMemoryIngredientStock('SUGAR', consumption.totalSugarGrams);
+      }
+      if (consumption.totalIceGrams > 0) {
+        ProductsService.deductInMemoryIngredientStock('ICE', consumption.totalIceGrams);
+      }
+
+      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (luôn đảm bảo stock >= 0)
+      try {
+        if ((this.prisma as any)?.ingredient?.findUnique) {
+          if (consumption.totalSugarGrams > 0) {
+            const currentSugar = await (this.prisma as any).ingredient.findUnique({
+              where: { code: 'SUGAR' },
+            });
+            if (currentSugar) {
+              const newSugarStock = Math.max(0, Math.round((currentSugar.stock - consumption.totalSugarGrams) * 10) / 10);
+              await (this.prisma as any).ingredient.update({
+                where: { code: 'SUGAR' },
+                data: { stock: newSugarStock },
+              });
+            }
+          }
+          if (consumption.totalIceGrams > 0) {
+            const currentIce = await (this.prisma as any).ingredient.findUnique({
+              where: { code: 'ICE' },
+            });
+            if (currentIce) {
+              const newIceStock = Math.max(0, Math.round((currentIce.stock - consumption.totalIceGrams) * 10) / 10);
+              await (this.prisma as any).ingredient.update({
+                where: { code: 'ICE' },
+                data: { stock: newIceStock },
+              });
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('Không thể trừ tồn kho Đường/Đá trong DB (in-memory đã trừ):', dbErr);
+      }
+    } catch (err) {
+      console.warn('Lỗi khi tính toán và trừ tồn kho Đường/Đá:', err);
+    }
   }
 
   async processPayment(dto: CreatePaymentDto) {
@@ -128,6 +280,13 @@ export class PaymentsService {
       return { payment, order: updatedOrder };
     });
 
+    // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
+    if (gatewayResult.success) {
+      await this.deductProductStock(order.id);
+      await this.deductToppingStock(order.id);
+      await this.deductSugarAndIceStock(order.id);
+    }
+
     return {
       success: gatewayResult.success,
       isIdempotent: false,
@@ -220,6 +379,13 @@ export class PaymentsService {
 
       return { payment, order: updatedOrder };
     });
+
+    // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
+    if (verified.isSuccess) {
+      await this.deductProductStock(order.id);
+      await this.deductToppingStock(order.id);
+      await this.deductSugarAndIceStock(order.id);
+    }
 
     return {
       success: verified.isSuccess,
@@ -324,6 +490,13 @@ export class PaymentsService {
 
       return { payment, order: updatedOrder };
     });
+
+    // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
+    if (verified.isSuccess) {
+      await this.deductProductStock(order.id);
+      await this.deductToppingStock(order.id);
+      await this.deductSugarAndIceStock(order.id);
+    }
 
     return {
       success: verified.isSuccess,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStoredUser } from '@/lib/auth';
 import { X, Plus, Minus, Check, Coffee, Sparkles } from 'lucide-react';
@@ -41,6 +41,58 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   const [quantity, setQuantity] = useState<number>(1);
   const [specialNote, setSpecialNote] = useState<string>('');
   const [addedToast, setAddedToast] = useState<boolean>(false);
+  const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
+  const [ingredientsList, setIngredientsList] = useState<Array<{ code: string; name: string; stock: number; isAvailable: boolean }>>([]);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchData = async () => {
+      try {
+        const [toppingsRes, ingRes] = await Promise.all([
+          fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' }),
+          fetch(`${apiUrl}/products/ingredients`, { cache: 'no-store' }),
+        ]);
+
+        if (toppingsRes.ok) {
+          const list = await toppingsRes.json();
+          if (Array.isArray(list) && list.length > 0 && isMounted) {
+            setToppingsList(list);
+          }
+        }
+
+        if (ingRes.ok) {
+          const ingData = await ingRes.json();
+          if (Array.isArray(ingData) && isMounted) {
+            setIngredientsList(ingData);
+
+            const iceIng = ingData.find((i: any) => i.code === 'ICE');
+            if (iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable)) {
+              setIce('Không đá');
+            }
+
+            const sugarIng = ingData.find((i: any) => i.code === 'SUGAR');
+            if (sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable)) {
+              setSweetness('0%');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Không thể tải topping/nguyên liệu từ backend trong modal, dùng fallback:', err);
+      }
+    };
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [apiUrl]);
+
+  const iceIngredient = ingredientsList.find((i) => i.code === 'ICE');
+  const isIceOutOfStock = Boolean(iceIngredient && (iceIngredient.stock <= 0 || !iceIngredient.isAvailable));
+
+  const sugarIngredient = ingredientsList.find((i) => i.code === 'SUGAR');
+  const isSugarOutOfStock = Boolean(sugarIngredient && (sugarIngredient.stock <= 0 || !sugarIngredient.isAvailable));
 
   const pricing = useMemo(() => {
     if (!product) return null;
@@ -75,6 +127,8 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
     await addToCart({
       productId: product.id,
       size,
+      sweetness,
+      ice,
       qty: quantity,
       toppings: selectedToppings,
     });
@@ -184,23 +238,31 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-stone-600">
                 <span className="font-medium">Lượng đường</span>
-                <span className="text-amber-800 font-semibold">{sweetness}</span>
+                <span className="text-amber-800 font-semibold">
+                  {sweetness} {isSugarOutOfStock && <span className="text-rose-600 font-normal">(Kho hết đường)</span>}
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {SWEETNESS_OPTIONS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setSweetness(level)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                      sweetness === level
-                        ? 'bg-amber-700 text-white border-amber-700'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
+                {SWEETNESS_OPTIONS.map((level) => {
+                  const isDisabled = isSugarOutOfStock && level !== '0%';
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && setSweetness(level)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                        isDisabled
+                          ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                          : sweetness === level
+                            ? 'bg-amber-700 text-white border-amber-700'
+                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -208,23 +270,31 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             <div className="space-y-1.5 pt-2 border-t border-stone-50">
               <div className="flex justify-between text-xs text-stone-600">
                 <span className="font-medium">Lượng đá</span>
-                <span className="text-amber-800 font-semibold">{ice}</span>
+                <span className="text-amber-800 font-semibold">
+                  {ice} {isIceOutOfStock && <span className="text-rose-600 font-normal">(Kho hết đá viên)</span>}
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {ICE_OPTIONS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setIce(level)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                      ice === level
-                        ? 'bg-amber-700 text-white border-amber-700'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
+                {ICE_OPTIONS.map((level) => {
+                  const isDisabled = isIceOutOfStock && level !== 'Không đá';
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && setIce(level)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                        isDisabled
+                          ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                          : ice === level
+                            ? 'bg-amber-700 text-white border-amber-700'
+                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -242,16 +312,23 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              {COFFEE_TOPPINGS.map((topping) => {
+              {toppingsList.map((topping) => {
+                const isOutOfStock = topping.isAvailable === false || (typeof topping.stock === 'number' && topping.stock <= 0);
                 const isChecked = selectedToppings.some((t) => t.id === topping.id);
                 return (
                   <label
                     key={topping.id}
-                    onClick={() => handleToggleTopping(topping)}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition select-none ${
-                      isChecked
-                        ? 'border-amber-700 bg-amber-50/60'
-                        : 'border-stone-200 hover:bg-stone-50 bg-white'
+                    onClick={() => {
+                      if (!isOutOfStock) {
+                        handleToggleTopping(topping);
+                      }
+                    }}
+                    className={`flex items-center justify-between p-3 rounded-xl border select-none transition ${
+                      isOutOfStock
+                        ? 'opacity-40 bg-stone-50 border-stone-200 cursor-not-allowed'
+                        : isChecked
+                          ? 'border-amber-700 bg-amber-50/60 cursor-pointer'
+                          : 'border-stone-200 hover:bg-stone-50 bg-white cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -265,7 +342,7 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
                         {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                       <span className="text-xs font-medium text-stone-800">
-                        {topping.name}
+                        {topping.name} {isOutOfStock && <span className="text-rose-600 font-normal">(Hết hàng)</span>}
                       </span>
                     </div>
                     <span className="text-xs font-bold text-amber-900">

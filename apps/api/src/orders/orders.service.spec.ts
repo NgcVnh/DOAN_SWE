@@ -63,7 +63,7 @@ describe('OrdersService - Pricing, Promotions & Loyalty Points (Task 10.3)', () 
       id: 1,
       loyaltyPoints: 0,
     });
-    prismaMock.order.create.mockImplementation(({ data }) => ({
+    prismaMock.order.create.mockImplementation(({ data }: { data: any }) => ({
       id: 101,
       userId: data.userId,
       status: data.status,
@@ -129,7 +129,7 @@ describe('OrdersService - Pricing, Promotions & Loyalty Points (Task 10.3)', () 
       expiredAt: new Date(Date.now() + 86400000),
     });
 
-    prismaMock.order.create.mockImplementation(({ data }) => ({
+    prismaMock.order.create.mockImplementation(({ data }: { data: any }) => ({
       id: 102,
       userId: data.userId,
       status: data.status,
@@ -191,5 +191,102 @@ describe('OrdersService - Pricing, Promotions & Loyalty Points (Task 10.3)', () 
         1,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('từ chối tạo đơn nếu sản phẩm hết hàng hoặc số lượng đặt vượt quá tồn kho', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Cà phê Sữa Đá', price: 35000, stock: 0, isAvailable: false },
+    ]);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 1, loyaltyPoints: 10 });
+
+    await expect(
+      ordersService.createOrder(
+        {
+          items: [{ productId: '1', quantity: 1, size: DrinkSize.S }],
+        },
+        1,
+      ),
+    ).rejects.toThrow('đã hết hàng');
+  });
+
+  it('từ chối tạo đơn nếu nguyên liệu đá viên không đủ đáp ứng', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Cà phê Sữa Đá', price: 35000, stock: 50, isAvailable: true },
+    ]);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 1, loyaltyPoints: 10 });
+    prismaMock.ingredient = {
+      findUnique: vi.fn().mockImplementation(({ where }) => {
+        if (where.code === 'ICE') {
+          return Promise.resolve({ code: 'ICE', stock: 50 }); // Chỉ còn 50g đá
+        }
+        return Promise.resolve({ code: 'SUGAR', stock: 10000 });
+      }),
+    };
+
+    // Đặt ly size M (cần 200g đá) nhưng kho chỉ có 50g
+    await expect(
+      ordersService.createOrder(
+        {
+          items: [{ productId: '1', quantity: 1, size: DrinkSize.M, ice: 'Bình thường' }],
+        },
+        1,
+      ),
+    ).rejects.toThrow('Đá viên tinh khiết không đủ');
+  });
+
+  it('từ chối tạo đơn nếu nguyên liệu đường cát không đủ đáp ứng', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Americano', price: 40000, stock: 50, isAvailable: true },
+    ]);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 1, loyaltyPoints: 10 });
+    prismaMock.ingredient = {
+      findUnique: vi.fn().mockImplementation(({ where }) => {
+        if (where.code === 'SUGAR') {
+          return Promise.resolve({ code: 'SUGAR', stock: 10 }); // Chỉ còn 10g đường
+        }
+        return Promise.resolve({ code: 'ICE', stock: 50000 });
+      }),
+    };
+
+    // Đặt ly size L 100% đường (cần 40g đường) nhưng kho chỉ có 10g
+    await expect(
+      ordersService.createOrder(
+        {
+          items: [{ productId: '1', quantity: 1, size: DrinkSize.L, sweetness: '100%', ice: 'Không đá' }],
+        },
+        1,
+      ),
+    ).rejects.toThrow('Đường cát tinh luyện không đủ');
+  });
+
+  it('từ chối tạo đơn nếu Topping được chọn đã hết hàng', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Trà Sữa Ô Long', price: 35000, stock: 50, isAvailable: true },
+    ]);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 1, loyaltyPoints: 10 });
+    prismaMock.topping = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 2,
+        name: 'Trân châu trắng',
+        stock: 0,
+        isAvailable: false,
+      }),
+    };
+
+    await expect(
+      ordersService.createOrder(
+        {
+          items: [
+            {
+              productId: '1',
+              quantity: 1,
+              size: DrinkSize.M,
+              toppings: ['Trân châu trắng'],
+            },
+          ],
+        },
+        1,
+      ),
+    ).rejects.toThrow('Topping "Trân châu trắng" đã hết hàng');
   });
 });

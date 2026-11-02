@@ -25,6 +25,14 @@ export class CreateOrderItemDto {
   size: DrinkSize;
 
   @IsOptional()
+  @IsString()
+  sweetness?: string;
+
+  @IsOptional()
+  @IsString()
+  ice?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   toppings?: string[];

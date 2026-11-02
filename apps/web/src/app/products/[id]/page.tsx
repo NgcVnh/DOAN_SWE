@@ -43,15 +43,36 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [product, setProduct] = useState<ProductDetailItem | null>(null);
+  const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
+  const [ingredientsList, setIngredientsList] = useState<Array<{ code: string; name: string; stock: number; isAvailable: boolean }>>([]);
 
   useEffect(() => {
     let isMounted = true;
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
-        if (res.ok) {
-          const list = await res.json();
+        const [productsRes, ingRes] = await Promise.all([
+          fetch(`${apiUrl}/products`, { cache: 'no-store' }),
+          fetch(`${apiUrl}/products/ingredients`, { cache: 'no-store' }),
+        ]);
+
+        if (ingRes.ok) {
+          const ingData = await ingRes.json();
+          if (Array.isArray(ingData) && isMounted) {
+            setIngredientsList(ingData);
+            const iceIng = ingData.find((i: any) => i.code === 'ICE');
+            if (iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable)) {
+              setIce('Không đá');
+            }
+            const sugarIng = ingData.find((i: any) => i.code === 'SUGAR');
+            if (sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable)) {
+              setSweetness('0%');
+            }
+          }
+        }
+
+        if (productsRes.ok) {
+          const list = await productsRes.json();
           const found = list.find((p: { id: number; name: string; price: number; image: string; description?: string }) => Number(p.id) === productId);
           if (found && isMounted) {
             setProduct({
@@ -77,7 +98,22 @@ export default function ProductDetailPage({ params }: PageProps) {
       }
     };
 
+    const fetchToppings = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' });
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0 && isMounted) {
+            setToppingsList(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Không thể tải topping từ backend, dùng fallback:', err);
+      }
+    };
+
     fetchProduct();
+    fetchToppings();
     return () => {
       isMounted = false;
     };
@@ -99,6 +135,9 @@ export default function ProductDetailPage({ params }: PageProps) {
   }, [currentPrice, size, selectedToppings, quantity]);
 
   const handleToggleTopping = (topping: ToppingOption) => {
+    const isOutOfStock = topping.stock !== undefined ? topping.stock <= 0 : topping.isAvailable === false;
+    if (isOutOfStock) return;
+
     setSelectedToppings((prev) => {
       const exists = prev.some((t) => t.id === topping.id);
       if (exists) {
@@ -127,6 +166,8 @@ export default function ProductDetailPage({ params }: PageProps) {
       name: product.name,
       unitPrice: pricing.unitPrice,
       size,
+      sweetness,
+      ice,
       qty: quantity,
       toppings: selectedToppings,
     });
@@ -262,33 +303,53 @@ export default function ProductDetailPage({ params }: PageProps) {
           </div>
 
           <div className="space-y-2">
-            {COFFEE_TOPPINGS.map((topping) => {
+            {toppingsList.map((topping) => {
               const isChecked = selectedToppings.some((t) => t.id === topping.id);
+              const isOutOfStock = topping.stock !== undefined ? topping.stock <= 0 : topping.isAvailable === false;
+              const remainingStock = topping.stock !== undefined ? topping.stock : (topping.isAvailable ? 10 : 0);
+
               return (
                 <div
                   key={topping.id}
                   onClick={() => handleToggleTopping(topping)}
-                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition select-none ${
-                    isChecked
-                      ? 'border-amber-700 bg-amber-50/60'
-                      : 'border-stone-200 hover:bg-stone-50 bg-white'
+                  className={`flex items-center justify-between p-3 rounded-xl border transition select-none ${
+                    isOutOfStock
+                      ? 'border-stone-200 bg-stone-100/80 opacity-60 cursor-not-allowed'
+                      : isChecked
+                      ? 'border-amber-700 bg-amber-50/60 cursor-pointer shadow-sm'
+                      : 'border-stone-200 hover:bg-stone-50 bg-white cursor-pointer'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-4 h-4 rounded border flex items-center justify-center transition ${
-                        isChecked
+                        isOutOfStock
+                          ? 'border-stone-300 bg-stone-200 text-transparent'
+                          : isChecked
                           ? 'bg-amber-700 border-amber-700 text-white'
                           : 'border-stone-300 bg-white'
                       }`}
                     >
-                      {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                      {isChecked && !isOutOfStock && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
-                    <span className="text-xs font-medium text-stone-800">
-                      {topping.name}
-                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${isOutOfStock ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
+                          {topping.name}
+                        </span>
+                        {isOutOfStock ? (
+                          <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">
+                            Hết hàng
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-full">
+                            Còn lại: {remainingStock}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-amber-900">
+                  <span className={`text-xs font-bold ${isOutOfStock ? 'text-stone-400' : 'text-amber-900'}`}>
                     +{topping.price.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
@@ -298,57 +359,82 @@ export default function ProductDetailPage({ params }: PageProps) {
         </div>
 
         {/* 3. Tùy chỉnh Độ ngọt & Lượng đá */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-3.5">
-          <h3 className="font-semibold text-stone-900 text-sm pb-1 border-b border-stone-100">
-            Tùy chỉnh khẩu vị
-          </h3>
+        {(() => {
+          const iceIng = ingredientsList.find((i) => i.code === 'ICE');
+          const isIceOut = Boolean(iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable));
+          const sugarIng = ingredientsList.find((i) => i.code === 'SUGAR');
+          const isSugarOut = Boolean(sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable));
 
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-stone-600">
-              <span className="font-medium">Lượng đường</span>
-              <span className="text-amber-800 font-semibold">{sweetness}</span>
-            </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {SWEETNESS_OPTIONS.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setSweetness(level)}
-                  className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
-                    sweetness === level
-                      ? 'bg-amber-700 text-white border-amber-700'
-                      : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
+          return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-3.5">
+              <h3 className="font-semibold text-stone-900 text-sm pb-1 border-b border-stone-100">
+                Tùy chỉnh khẩu vị
+              </h3>
 
-          <div className="space-y-1.5 pt-2 border-t border-stone-50">
-            <div className="flex justify-between text-xs text-stone-600">
-              <span className="font-medium">Lượng đá</span>
-              <span className="text-amber-800 font-semibold">{ice}</span>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span className="font-medium">Lượng đường</span>
+                  <span className="text-amber-800 font-semibold">
+                    {sweetness} {isSugarOut && <span className="text-rose-600 font-normal">(Kho hết đường)</span>}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {SWEETNESS_OPTIONS.map((level) => {
+                    const isDisabled = isSugarOut && level !== '0%';
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setSweetness(level)}
+                        className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
+                          isDisabled
+                            ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                            : sweetness === level
+                              ? 'bg-amber-700 text-white border-amber-700'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-stone-50">
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span className="font-medium">Lượng đá</span>
+                  <span className="text-amber-800 font-semibold">
+                    {ice} {isIceOut && <span className="text-rose-600 font-normal">(Kho hết đá viên)</span>}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {ICE_OPTIONS.map((level) => {
+                    const isDisabled = isIceOut && level !== 'Không đá';
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setIce(level)}
+                        className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
+                          isDisabled
+                            ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                            : ice === level
+                              ? 'bg-amber-700 text-white border-amber-700'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {ICE_OPTIONS.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setIce(level)}
-                  className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
-                    ice === level
-                      ? 'bg-amber-700 text-white border-amber-700'
-                      : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* 4. Bảng tính giá theo tùy chọn thời gian thực (Task 4) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-2.5 text-xs text-stone-600">

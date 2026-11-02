@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { assertTransition } from './order-state-machine.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
 import { LoyaltyPointsService } from '../promotions/loyalty.service.js';
+import { calculateSugarAndIceConsumption } from '../products/sugar-ice.calculator.js';
+import { ProductsService } from '../products/products.service.js';
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [
@@ -52,11 +54,95 @@ export class OrdersService {
     const createdOrder = await this.prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true, price: true },
+        select: { id: true, price: true, name: true, stock: true, isAvailable: true },
       });
+      const productMap = new Map(products.map((product) => [product.id, product]));
       const prices = new Map(products.map((product) => [product.id, product.price]));
       if (products.length !== new Set(productIds).size) {
         throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
+      }
+
+      // 1. Kiểm tra tồn kho của từng sản phẩm
+      for (const item of createOrderDto.items) {
+        const prodId = Number(item.productId);
+        const prod = productMap.get(prodId);
+        if (prod) {
+          if (prod.isAvailable === false || (typeof prod.stock === 'number' && prod.stock <= 0)) {
+            throw new BadRequestException(`Sản phẩm "${prod.name || prodId}" đã hết hàng`);
+          }
+          if (typeof prod.stock === 'number' && prod.stock < item.quantity) {
+            throw new BadRequestException(
+              `Sản phẩm "${prod.name || prodId}" không đủ số lượng trong kho (chỉ còn ${prod.stock} ly, bạn đặt ${item.quantity} ly)`,
+            );
+          }
+        }
+      }
+
+      // 2. Kiểm tra tồn kho của Topping
+      if ((tx as any)?.topping?.findFirst) {
+        for (const item of createOrderDto.items) {
+          if (item.toppings && item.toppings.length > 0) {
+            for (const tName of item.toppings) {
+              const topping = await (tx as any).topping.findFirst({
+                where: { name: tName.trim() },
+              });
+              if (topping) {
+                if (topping.isAvailable === false || (typeof topping.stock === 'number' && topping.stock <= 0)) {
+                  throw new BadRequestException(`Topping "${topping.name}" đã hết hàng`);
+                }
+                if (typeof topping.stock === 'number' && topping.stock < item.quantity) {
+                  throw new BadRequestException(
+                    `Topping "${topping.name}" không đủ số lượng (chỉ còn ${topping.stock})`,
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Kiểm tra định mức tồn kho Đá & Đường
+      const consumption = calculateSugarAndIceConsumption(
+        createOrderDto.items.map((it) => ({
+          size: it.size,
+          sweetness: it.sweetness,
+          ice: it.ice,
+          qty: it.quantity,
+        })),
+      );
+
+      // Kiểm tra Đá viên
+      if (consumption.totalIceGrams > 0) {
+        let currentIceStock: number | null = null;
+        if ((tx as any)?.ingredient?.findUnique) {
+          const iceRecord = await (tx as any).ingredient.findUnique({ where: { code: 'ICE' } });
+          if (iceRecord) currentIceStock = iceRecord.stock;
+        }
+        if (currentIceStock === null) {
+          currentIceStock = ProductsService.getInMemoryIngredientStock('ICE');
+        }
+        if (typeof currentIceStock === 'number' && currentIceStock < consumption.totalIceGrams) {
+          throw new BadRequestException(
+            `Nguyên liệu Đá viên tinh khiết không đủ để pha chế (kho còn ${currentIceStock}g, đơn yêu cầu ${consumption.totalIceGrams}g). Vui lòng chọn "Không đá" hoặc giảm số lượng ly!`,
+          );
+        }
+      }
+
+      // Kiểm tra Đường cát
+      if (consumption.totalSugarGrams > 0) {
+        let currentSugarStock: number | null = null;
+        if ((tx as any)?.ingredient?.findUnique) {
+          const sugarRecord = await (tx as any).ingredient.findUnique({ where: { code: 'SUGAR' } });
+          if (sugarRecord) currentSugarStock = sugarRecord.stock;
+        }
+        if (currentSugarStock === null) {
+          currentSugarStock = ProductsService.getInMemoryIngredientStock('SUGAR');
+        }
+        if (typeof currentSugarStock === 'number' && currentSugarStock < consumption.totalSugarGrams) {
+          throw new BadRequestException(
+            `Nguyên liệu Đường cát tinh luyện không đủ để pha chế (kho còn ${currentSugarStock}g, đơn yêu cầu ${consumption.totalSugarGrams}g). Vui lòng chọn "0% đường" hoặc giảm số lượng ly!`,
+          );
+        }
       }
 
       let calculatedSubtotal = 0;
@@ -81,6 +167,8 @@ export class OrdersService {
         return {
           productId,
           size: item.size as ProductSize,
+          sweetness: item.sweetness || '100%',
+          ice: item.ice || 'Bình thường',
           toppings: item.toppings || [],
           unitPrice,
           qty: item.quantity,

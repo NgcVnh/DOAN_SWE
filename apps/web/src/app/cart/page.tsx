@@ -93,7 +93,7 @@ export default function CartPage() {
                     </div>
 
                     <div className="text-xs text-stone-500 mt-0.5 space-y-0.5">
-                      <p>Kích cỡ: <span className="font-medium text-stone-700">Size {item.size}</span></p>
+                      <p>Kích cỡ: <span className="font-medium text-stone-700">Size {item.size}</span>{item.sweetness && <span className="ml-2">| Đường: {item.sweetness}</span>}{item.ice && <span className="ml-2">| Đá: {item.ice}</span>}</p>
                       {item.toppings && item.toppings.length > 0 && (
                         <p>Topping: {item.toppings.map((t) => t.name).join(', ')}</p>
                       )}
