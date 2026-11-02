@@ -2,7 +2,7 @@ name: BrewLite CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master, develop, Nhanbranch, DucBranch, quy-branch]
+    branches: [main, master, develop, Nhanbranch, DucBranch, quy-branch, Dang]
   pull_request:
     branches: [main, master, develop]
 
@@ -12,11 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-  build-and-test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js 20
@@ -26,8 +21,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'apps/api/package.json'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
         run: npm --prefix apps/api install
+
+      - name: Generate Prisma Client
+        run: npm --prefix apps/api run prisma:generate
 
       - name: Build Backend
         run: npm --prefix apps/api run build
@@ -46,29 +44,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Check Frontend Structure
-        run: |
-          test -d apps/web/src
-          echo "Frontend src directory verified"
-          cache-dependency-path: |
-            apps/api/package.json
-            apps/web/package.json
-
-      - name: Install Backend Dependencies
-        run: npm --prefix apps/api install
-
-      - name: Generate Prisma Client
-        run: npm --prefix apps/api run prisma:generate
-
-      - name: Build Backend
-        run: npm --prefix apps/api run build
-
-      - name: Run Backend Unit Tests
-        run: npm --prefix apps/api run test
+          cache: 'npm'
+          cache-dependency-path: 'apps/web/package.json'
 
       - name: Install Frontend Dependencies
         run: npm --prefix apps/web install
 
       - name: Build Frontend
         run: npm --prefix apps/web run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
