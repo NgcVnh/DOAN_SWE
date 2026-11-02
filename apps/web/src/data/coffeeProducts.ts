@@ -22,6 +22,13 @@ export const SIZE_STANDARDS: Record<ProductSize, { sugar: number; ice: number }>
   M: { sugar: 35, ice: 200 },
   L: { sugar: 40, ice: 250 },
 };
+// Định mức nguyên liệu cốt: Cà phê và Trà theo từng size (đơn vị: gram)
+export const BASE_INGREDIENT_STANDARDS: Record<ProductSize, { coffee: number; tea: number }> = {
+  S: { coffee: 16, tea: 10 },
+  M: { coffee: 20, tea: 15 },
+  L: { coffee: 25, tea: 20 },
+};
+
 
 // Hệ số mức đường
 export const SWEETNESS_FACTORS: Record<SweetnessLevel, number> = {
@@ -33,6 +40,27 @@ export const SWEETNESS_FACTORS: Record<SweetnessLevel, number> = {
 };
 
 // Hệ số mức đá
+
+/**
+ * Phân loại sản phẩm dựa trên tên hoặc ID để xác định dùng nguyên liệu cốt Cà phê hay Trà
+ */
+export function getProductBaseType(nameOrId?: string | number | null): 'COFFEE' | 'TEA' | 'NONE' {
+  if (!nameOrId) return 'COFFEE';
+  const str = String(nameOrId).toLowerCase().trim();
+
+  if (
+    str.includes('trà') ||
+    str.includes('tea') ||
+    str.includes('oolong') ||
+    str.includes('ô long') ||
+    str.includes('đào cam sả')
+  ) {
+    return 'TEA';
+  }
+
+  return 'COFFEE';
+}
+
 export const ICE_FACTORS: Record<IceLevel, number> = {
   'Không đá': 0.0,
   'Ít đá': 0.5,

@@ -1,12 +1,63 @@
 import { Injectable } from '@nestjs/common';
 import { Products } from './Interfaces/product.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  BASE_INGREDIENT_STANDARDS,
+  getProductBaseType,
+} from './sugar-ice.calculator.js';
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Danh sách nguyên liệu trong bộ nhớ (In-memory fallback & đồng bộ DB)
+  private static inMemoryToppings = [
+    { id: 1, name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
+    { id: 2, name: 'Trân châu trắng', price: 10000, stock: 0, isAvailable: false },
+    { id: 3, name: 'Kem Cheese', price: 12000, stock: 8, isAvailable: true },
+    { id: 4, name: 'Thạch nha đam', price: 8000, stock: 20, isAvailable: true },
+  ];
+
+  private static inMemoryIngredients = [
+    { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 },
+    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },
+    { code: 'COFFEE_BEANS', name: 'Hạt cà phê Robusta rang mộc', stock: 5000, unit: 'g', minThreshold: 500 }, // 5kg
+    { code: 'TEA_LEAVES', name: 'Lá trà Oolong & Trà đen khô', stock: 3000, unit: 'g', minThreshold: 300 },   // 3kg
+  ];
+
+  /**
+   * Kiểm tra một sản phẩm có đủ nguyên liệu tối thiểu (Size S) để bán hay không
+   */
+  static isProductAvailableByStock(
+    productName: string,
+    coffeeStock: number,
+    teaStock: number,
+  ): boolean {
+    const baseType = getProductBaseType(productName);
+    if (baseType === 'COFFEE') {
+      return coffeeStock >= BASE_INGREDIENT_STANDARDS.S.coffee;
+    }
+    if (baseType === 'TEA') {
+      return teaStock >= BASE_INGREDIENT_STANDARDS.S.tea;
+    }
+    return true;
+  }
+
   async findAll(): Promise<Products[]> {
+    let coffeeStock = ProductsService.getInMemoryIngredientStock('COFFEE_BEANS');
+    let teaStock = ProductsService.getInMemoryIngredientStock('TEA_LEAVES');
+
+    try {
+      if (this.prisma?.isConnected !== false && (this.prisma as any)?.ingredient?.findUnique) {
+        const cRecord = await (this.prisma as any).ingredient.findUnique({ where: { code: 'COFFEE_BEANS' } });
+        const tRecord = await (this.prisma as any).ingredient.findUnique({ where: { code: 'TEA_LEAVES' } });
+        if (cRecord) coffeeStock = cRecord.stock;
+        if (tRecord) teaStock = tRecord.stock;
+      }
+    } catch {
+      // In-memory fallback
+    }
+
     try {
       if (this.prisma?.isConnected !== false && this.prisma?.product?.findMany) {
         const products = await this.prisma.product.findMany({
@@ -14,19 +65,27 @@ export class ProductsService {
         });
 
         if (products && products.length > 0) {
-          return products.map((p) => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.imageUrl || '',
-            description: p.description ?? undefined,
-          }));
+          return products.map((p) => {
+            const hasBaseIngredient = ProductsService.isProductAvailableByStock(
+              p.name,
+              coffeeStock,
+              teaStock,
+            );
+            return {
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              image: p.imageUrl || '',
+              description: p.description ?? undefined,
+              isAvailable: p.isAvailable && hasBaseIngredient,
+            };
+          });
         }
       }
     } catch {
     }
 
-    return [
+    const fallbackProducts = [
       {
         id: 1,
         name: 'Cà phê Đen Đá',
@@ -56,20 +115,12 @@ export class ProductsService {
         description: 'Nhiều sữa ít cà phê, béo ngậy ngọt ngào phù hợp mọi người.',
       },
     ];
+
+    return fallbackProducts.map((p) => ({
+      ...p,
+      isAvailable: ProductsService.isProductAvailableByStock(p.name, coffeeStock, teaStock),
+    }));
   }
-
-  private static inMemoryToppings = [
-    { id: 1, name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
-    { id: 2, name: 'Trân châu trắng', price: 10000, stock: 0, isAvailable: false },
-    { id: 3, name: 'Kem Cheese', price: 12000, stock: 8, isAvailable: true },
-    { id: 4, name: 'Thạch nha đam', price: 8000, stock: 20, isAvailable: true },
-  ];
-
-  // In-memory fallback cho nguyên liệu Đường & Đá (đơn vị: gram)
-  private static inMemoryIngredients = [
-    { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 },
-    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },
-  ];
 
   async findAllToppings() {
     try {
@@ -136,23 +187,30 @@ export class ProductsService {
     }));
   }
 
-  static deductInMemoryIngredientStock(code: 'SUGAR' | 'ICE', amountGrams: number) {
+  static deductInMemoryIngredientStock(
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
+    amountGrams: number,
+  ) {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
     if (ing) {
       ing.stock = Math.max(0, Math.round((ing.stock - amountGrams) * 10) / 10);
     }
   }
 
-  static getInMemoryIngredientStock(code: 'SUGAR' | 'ICE'): number {
+  static getInMemoryIngredientStock(
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
+  ): number {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
     return ing ? ing.stock : 999999;
   }
 
-  static setInMemoryIngredientStock(code: 'SUGAR' | 'ICE', newStock: number) {
+  static setInMemoryIngredientStock(
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
+    newStock: number,
+  ) {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
     if (ing) {
       ing.stock = Math.max(0, newStock);
     }
   }
-
 }

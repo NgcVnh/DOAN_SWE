@@ -20,6 +20,8 @@ import {
   SIZE_STANDARDS,
   SWEETNESS_FACTORS,
   ICE_FACTORS,
+  BASE_INGREDIENT_STANDARDS,
+  getProductBaseType,
   calculateCustomizedPrice,
 } from '../data/coffeeProducts';
 import { useCartStore } from '../store/useCartStore';
@@ -72,11 +74,28 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   }, [apiUrl]);
 
 
-  // Tính toán lượng đường/đá còn lại trong kho
+  // Tính toán lượng nguyên liệu cốt (Cà phê, Trà) và Đường, Đá còn lại trong kho
   const sugarIngredient = ingredients.find((i) => i.code === 'SUGAR');
   const iceIngredient = ingredients.find((i) => i.code === 'ICE');
+  const coffeeIngredient = ingredients.find((i) => i.code === 'COFFEE_BEANS');
+  const teaIngredient = ingredients.find((i) => i.code === 'TEA_LEAVES');
+
   const sugarStock = sugarIngredient ? sugarIngredient.stock : 999999;
   const iceStock = iceIngredient ? iceIngredient.stock : 999999;
+  const coffeeStock = coffeeIngredient ? coffeeIngredient.stock : 999999;
+  const teaStock = teaIngredient ? teaIngredient.stock : 999999;
+
+  const baseType = getProductBaseType(product?.name || '');
+  const availableBaseStock = baseType === 'TEA' ? teaStock : coffeeStock;
+  const baseIngredientName = baseType === 'TEA' ? 'lá trà' : 'cà phê';
+
+  const isSizeAvailable = (checkSize: ProductSize) => {
+    const std = BASE_INGREDIENT_STANDARDS[checkSize] || BASE_INGREDIENT_STANDARDS.M;
+    const reqBase = (baseType === 'TEA' ? std.tea : std.coffee) * quantity;
+    return availableBaseStock >= reqBase;
+  };
+
+  const isCurrentProductSoldOut = !isSizeAvailable('S') && !isSizeAvailable('M') && !isSizeAvailable('L');
   const standard = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
   const pricing = useMemo(() => {
     if (!product) return null;

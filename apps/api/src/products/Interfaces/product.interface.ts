@@ -3,5 +3,6 @@ export interface Products {
   name: string; 
   price: number; 
   image: string; 
-  description?: string; 
+  description?: string;
+  isAvailable?: boolean;
 }

@@ -54,35 +54,61 @@ export class OrdersService {
     const createdOrder = await this.prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true, price: true },
+        select: { id: true, name: true, price: true },
       });
       const prices = new Map(products.map((product) => [product.id, product.price]));
       if (products.length !== new Set(productIds).size) {
         throw new BadRequestException('Một hoặc nhiều sản phẩm không tồn tại');
       }
 
-      // 1. Kiểm tra tồn kho nguyên liệu Đường & Đá
+      const productNames = new Map(products.map((product) => [product.id, product.name]));
+
+      // 1. Kiểm tra tồn kho nguyên liệu: Đường, Đá, Cà phê, Trà
       const consumption = calculateSugarAndIceConsumption(
-        createOrderDto.items.map((item) => ({
-          size: item.size,
-          sweetness: item.sweetness,
-          ice: item.ice,
-          qty: item.quantity,
-        })),
+        createOrderDto.items.map((item) => {
+          const pId = Number(item.productId);
+          return {
+            productId: pId,
+            productName: productNames.get(pId) || String(pId),
+            size: item.size,
+            sweetness: item.sweetness,
+            ice: item.ice,
+            qty: item.quantity,
+          };
+        }),
       );
 
-      // Lấy tồn kho đường & đá từ DB (hoặc fallback in-memory)
+      // Lấy tồn kho từ DB (hoặc fallback in-memory)
       let availableSugar = ProductsService.getInMemoryIngredientStock('SUGAR');
       let availableIce = ProductsService.getInMemoryIngredientStock('ICE');
+      let availableCoffee = ProductsService.getInMemoryIngredientStock('COFFEE_BEANS');
+      let availableTea = ProductsService.getInMemoryIngredientStock('TEA_LEAVES');
+
       try {
         if ((tx as any)?.ingredient?.findUnique) {
           const sugarRecord = await (tx as any).ingredient.findUnique({ where: { code: 'SUGAR' } });
           const iceRecord = await (tx as any).ingredient.findUnique({ where: { code: 'ICE' } });
+          const coffeeRecord = await (tx as any).ingredient.findUnique({ where: { code: 'COFFEE_BEANS' } });
+          const teaRecord = await (tx as any).ingredient.findUnique({ where: { code: 'TEA_LEAVES' } });
           if (sugarRecord) availableSugar = sugarRecord.stock;
           if (iceRecord) availableIce = iceRecord.stock;
+          if (coffeeRecord) availableCoffee = coffeeRecord.stock;
+          if (teaRecord) availableTea = teaRecord.stock;
         }
       } catch {
         // Fallback in-memory
+      }
+
+      if (consumption.totalCoffeeGrams > 0 && availableCoffee < consumption.totalCoffeeGrams) {
+        throw new BadRequestException(
+          `Kho không đủ hạt cà phê để pha chế (còn ${Math.max(0, Math.floor(availableCoffee))}g, cần ${consumption.totalCoffeeGrams}g). Rất tiếc món cà phê này hiện đã hết hàng!`,
+        );
+      }
+
+      if (consumption.totalTeaGrams > 0 && availableTea < consumption.totalTeaGrams) {
+        throw new BadRequestException(
+          `Kho không đủ lá trà để pha chế (còn ${Math.max(0, Math.floor(availableTea))}g, cần ${consumption.totalTeaGrams}g). Rất tiếc món trà này hiện đã hết hàng!`,
+        );
       }
 
       if (consumption.totalSugarGrams > 0 && availableSugar < consumption.totalSugarGrams) {

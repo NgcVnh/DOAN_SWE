@@ -28,6 +28,8 @@ import {
   SIZE_STANDARDS,
   SWEETNESS_FACTORS,
   ICE_FACTORS,
+  BASE_INGREDIENT_STANDARDS,
+  getProductBaseType,
   calculateCustomizedPrice,
 } from '../../../data/coffeeProducts';
 import { useCartStore } from '../../../store/useCartStore';
@@ -115,11 +117,28 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
 
-  // Tính toán lượng đường/đá còn lại trong kho
+  // Tính toán lượng nguyên liệu cốt (Cà phê, Trà) và Đường, Đá còn lại trong kho
   const sugarIngredient = ingredients.find((i) => i.code === 'SUGAR');
   const iceIngredient = ingredients.find((i) => i.code === 'ICE');
+  const coffeeIngredient = ingredients.find((i) => i.code === 'COFFEE_BEANS');
+  const teaIngredient = ingredients.find((i) => i.code === 'TEA_LEAVES');
+
   const sugarStock = sugarIngredient ? sugarIngredient.stock : 999999;
   const iceStock = iceIngredient ? iceIngredient.stock : 999999;
+  const coffeeStock = coffeeIngredient ? coffeeIngredient.stock : 999999;
+  const teaStock = teaIngredient ? teaIngredient.stock : 999999;
+
+  const baseType = getProductBaseType(product?.name || '');
+  const availableBaseStock = baseType === 'TEA' ? teaStock : coffeeStock;
+  const baseIngredientName = baseType === 'TEA' ? 'lá trà' : 'cà phê';
+
+  const isSizeAvailable = (checkSize: ProductSize) => {
+    const std = BASE_INGREDIENT_STANDARDS[checkSize] || BASE_INGREDIENT_STANDARDS.M;
+    const reqBase = (baseType === 'TEA' ? std.tea : std.coffee) * quantity;
+    return availableBaseStock >= reqBase;
+  };
+
+  const isCurrentProductSoldOut = !isSizeAvailable('S') && !isSizeAvailable('M') && !isSizeAvailable('L');
   const standard = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
   const currentPrice = product?.price || 35000;
   const pricing = useMemo(() => {
@@ -266,27 +285,31 @@ export default function ProductDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-3 gap-2.5">
             {(['S', 'M', 'L'] as ProductSize[]).map((s) => {
               const isSelected = size === s;
+              const sizeInStock = isSizeAvailable(s);
               return (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setSize(s)}
+                  disabled={!sizeInStock}
+                  onClick={() => sizeInStock && setSize(s)}
                   className={`p-3 rounded-xl border text-center transition flex flex-col items-center justify-center relative ${
-                    isSelected
+                    !sizeInStock
+                      ? 'border-stone-200 bg-stone-100 text-stone-400 cursor-not-allowed opacity-60'
+                      : isSelected
                       ? 'border-amber-700 bg-amber-50/70 text-amber-950 ring-1 ring-amber-700/30'
                       : 'border-stone-200 hover:border-amber-200 text-stone-700 bg-stone-50/40'
                   }`}
                 >
-                  {isSelected && (
+                  {isSelected && sizeInStock && (
                     <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-amber-700 text-white flex items-center justify-center text-[10px]">
                       <Check className="w-3 h-3 stroke-[3]" />
                     </span>
                   )}
-                  <span className="font-semibold text-sm">Size {s}</span>
+                  <span className={`font-semibold text-sm ${!sizeInStock ? 'line-through' : ''}`}>Size {s}</span>
                   <span className="text-[11px] text-stone-500 mt-0.5">
-                    {s === 'S' ? 'Nhỏ' : s === 'M' ? 'Vừa' : 'Lớn'}
+                    {!sizeInStock ? 'Hết size' : s === 'S' ? 'Nhỏ' : s === 'M' ? 'Vừa' : 'Lớn'}
                   </span>
-                  <span className="text-xs font-bold text-amber-800 mt-1">
+                  <span className={`text-xs font-bold mt-1 ${!sizeInStock ? 'text-stone-400' : 'text-amber-800'}`}>
                     +{SIZE_PRICES[s].toLocaleString('vi-VN')} đ
                   </span>
                 </button>
@@ -496,11 +519,23 @@ export default function ProductDetailPage({ params }: PageProps) {
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={isAdding}
-            className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center justify-between text-sm disabled:opacity-50"
+            disabled={isAdding || isCurrentProductSoldOut || !isSizeAvailable(size)}
+            className={`flex-1 font-semibold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-between text-sm ${
+              isCurrentProductSoldOut || !isSizeAvailable(size)
+                ? 'bg-stone-300 text-stone-500 cursor-not-allowed shadow-none'
+                : 'bg-amber-700 hover:bg-amber-800 text-white active:scale-95'
+            }`}
           >
-            <span>{isAdding ? 'Đang thêm...' : 'Thêm vào giỏ'}</span>
-            <span className="font-bold text-amber-100">
+            <span>
+              {isCurrentProductSoldOut
+                ? `Hết ${baseIngredientName} - Tạm ngưng bán`
+                : !isSizeAvailable(size)
+                ? `Hết nguyên liệu cho Size ${size}`
+                : isAdding
+                ? 'Đang thêm...'
+                : 'Thêm vào giỏ'}
+            </span>
+            <span className="font-bold">
               {pricing.lineTotal.toLocaleString('vi-VN')} đ
             </span>
           </button>
