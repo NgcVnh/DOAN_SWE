@@ -54,6 +54,17 @@ async function main() {
     const existing = await prisma.product.findFirst({ where: { name: p.name } });
     if (!existing) {
       await prisma.product.create({ data: p });
+    } else {
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: {
+          price: p.price,
+          stock: p.stock,
+          isAvailable: p.isAvailable,
+          imageUrl: p.imageUrl,
+          description: p.description,
+        },
+      });
     }
   }
 
@@ -68,6 +79,40 @@ async function main() {
     const existing = await prisma.topping.findFirst({ where: { name: t.name } });
     if (!existing) {
       await prisma.topping.create({ data: t });
+    } else {
+      await prisma.topping.update({
+        where: { id: existing.id },
+        data: {
+          price: t.price,
+          stock: t.stock,
+          isAvailable: t.isAvailable,
+        },
+      });
+    }
+  }
+
+  // Khởi tạo kho nguyên liệu: Đường & Đá (đơn vị: gram)
+  const ingredients = [
+    { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 }, // 20 kg
+    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },    // 50 kg
+  ];
+
+  for (const ing of ingredients) {
+    const existing = await prisma.ingredient.findUnique({
+      where: { code: ing.code },
+    });
+    if (!existing) {
+      await prisma.ingredient.create({ data: ing });
+    } else {
+      await prisma.ingredient.update({
+        where: { id: existing.id },
+        data: {
+          name: ing.name,
+          stock: ing.stock,
+          unit: ing.unit,
+          minThreshold: ing.minThreshold,
+        },
+      });
     }
   }
 

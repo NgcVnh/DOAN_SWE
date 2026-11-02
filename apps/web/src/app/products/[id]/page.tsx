@@ -16,8 +16,8 @@ import {
   SweetnessLevel,
   IceLevel,
   ToppingOption,
-  ProductDetailItem,
   IngredientOption,
+  ProductDetailItem,
 } from '../../../types/product';
 import {
   COFFEE_PRODUCTS,
@@ -25,9 +25,6 @@ import {
   SIZE_PRICES,
   SWEETNESS_OPTIONS,
   ICE_OPTIONS,
-  SIZE_STANDARDS,
-  SWEETNESS_FACTORS,
-  ICE_FACTORS,
   calculateCustomizedPrice,
 } from '../../../data/coffeeProducts';
 import { useCartStore } from '../../../store/useCartStore';
@@ -48,16 +45,45 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [product, setProduct] = useState<ProductDetailItem | null>(null);
   const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
-  const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
+  const [ingredientsList, setIngredientsList] = useState<IngredientOption[]>([]);
+
+  const { addToCart } = useCartStore();
+
+  const [size, setSize] = useState<ProductSize>('M');
+  const [selectedToppings, setSelectedToppings] = useState<ToppingOption[]>([]);
+  const [sweetness, setSweetness] = useState<SweetnessLevel>('100%');
+  const [ice, setIce] = useState<IceLevel>('Bình thường');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [showToast, setShowToast] = useState<boolean>(false);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
-        if (res.ok) {
-          const list = await res.json();
+        const [productsRes, ingRes] = await Promise.all([
+          fetch(`${apiUrl}/products`, { cache: 'no-store' }),
+          fetch(`${apiUrl}/products/ingredients`, { cache: 'no-store' }),
+        ]);
+
+        if (ingRes.ok) {
+          const ingData = await ingRes.json();
+          if (Array.isArray(ingData) && isMounted) {
+            setIngredientsList(ingData);
+            const iceIng = ingData.find((i: IngredientOption) => i.code === 'ICE');
+            if (iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable)) {
+              setIce('Không đá');
+            }
+            const sugarIng = ingData.find((i: IngredientOption) => i.code === 'SUGAR');
+            if (sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable)) {
+              setSweetness('0%');
+            }
+          }
+        }
+
+        if (productsRes.ok) {
+          const list = await productsRes.json();
           const found = list.find((p: { id: number; name: string; price: number; image: string; description?: string }) => Number(p.id) === productId);
           if (found && isMounted) {
             setProduct({
@@ -104,41 +130,11 @@ export default function ProductDetailPage({ params }: PageProps) {
     };
   }, [apiUrl, productId]);
 
-  const { addToCart } = useCartStore();
-
-  const [size, setSize] = useState<ProductSize>('M');
-  const [selectedToppings, setSelectedToppings] = useState<ToppingOption[]>([]);
-  const [sweetness, setSweetness] = useState<SweetnessLevel>('100%');
-  const [ice, setIce] = useState<IceLevel>('Bình thường');
-  const [quantity, setQuantity] = useState<number>(1);
-  const [showToast, setShowToast] = useState<boolean>(false);
-  const [isAdding, setIsAdding] = useState<boolean>(false);
-
-
-  // Tính toán lượng đường/đá còn lại trong kho
-  const sugarIngredient = ingredients.find((i) => i.code === 'SUGAR');
-  const iceIngredient = ingredients.find((i) => i.code === 'ICE');
-  const sugarStock = sugarIngredient ? sugarIngredient.stock : 999999;
-  const iceStock = iceIngredient ? iceIngredient.stock : 999999;
-  const standard = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
   const currentPrice = product?.price || 35000;
   const pricing = useMemo(() => {
     return calculateCustomizedPrice(currentPrice, size, selectedToppings, quantity);
   }, [currentPrice, size, selectedToppings, quantity]);
 
-
-  // Tự động chuyển khẩu vị an toàn nếu mức đường hoặc đá hiện tại đã hết hàng
-  useEffect(() => {
-    const std = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
-    const reqSugar = std.sugar * (SWEETNESS_FACTORS[sweetness] ?? 1.0) * quantity;
-    if (sweetness !== '0%' && sugarStock < reqSugar) {
-      setSweetness('0%');
-    }
-    const reqIce = std.ice * (ICE_FACTORS[ice] ?? 1.0) * quantity;
-    if (ice !== 'Không đá' && iceStock < reqIce) {
-      setIce('Không đá');
-    }
-  }, [size, quantity, sugarStock, iceStock, sweetness, ice]);
   const handleToggleTopping = (topping: ToppingOption) => {
     const isOutOfStock = topping.stock !== undefined ? topping.stock <= 0 : topping.isAvailable === false;
     if (isOutOfStock) return;
@@ -364,75 +360,82 @@ export default function ProductDetailPage({ params }: PageProps) {
         </div>
 
         {/* 3. Tùy chỉnh Độ ngọt & Lượng đá */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-3.5">
-          <h3 className="font-semibold text-stone-900 text-sm pb-1 border-b border-stone-100">
-            Tùy chỉnh khẩu vị
-          </h3>
+        {(() => {
+          const iceIng = ingredientsList.find((i) => i.code === 'ICE');
+          const isIceOut = Boolean(iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable));
+          const sugarIng = ingredientsList.find((i) => i.code === 'SUGAR');
+          const isSugarOut = Boolean(sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable));
 
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-stone-600">
-              <span className="font-medium">Lượng đường</span>
-              <span className="text-amber-800 font-semibold">{sweetness}</span>
-            </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {SWEETNESS_OPTIONS.map((level) => {
-                const requiredSugar = standard.sugar * (SWEETNESS_FACTORS[level] ?? 1.0) * quantity;
-                const isOutOfStock = level !== '0%' && sugarStock < requiredSugar;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    disabled={isOutOfStock}
-                    onClick={() => !isOutOfStock && setSweetness(level)}
-                    className={`py-1.5 rounded-lg text-xs font-semibold border transition flex flex-col items-center justify-center ${
-                      isOutOfStock
-                        ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed opacity-60 line-through'
-                        : sweetness === level
-                        ? 'bg-amber-700 text-white border-amber-700'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                    title={isOutOfStock ? 'Hết đường trong kho' : undefined}
-                  >
-                    <span>{level}</span>
-                    {isOutOfStock && <span className="text-[9px] text-red-500 font-normal no-underline">Hết</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-3.5">
+              <h3 className="font-semibold text-stone-900 text-sm pb-1 border-b border-stone-100">
+                Tùy chỉnh khẩu vị
+              </h3>
 
-          <div className="space-y-1.5 pt-2 border-t border-stone-50">
-            <div className="flex justify-between text-xs text-stone-600">
-              <span className="font-medium">Lượng đá</span>
-              <span className="text-amber-800 font-semibold">{ice}</span>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span className="font-medium">Lượng đường</span>
+                  <span className="text-amber-800 font-semibold">
+                    {sweetness} {isSugarOut && <span className="text-rose-600 font-normal">(Kho hết đường)</span>}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {SWEETNESS_OPTIONS.map((level) => {
+                    const isDisabled = isSugarOut && level !== '0%';
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setSweetness(level)}
+                        className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
+                          isDisabled
+                            ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                            : sweetness === level
+                              ? 'bg-amber-700 text-white border-amber-700'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-stone-50">
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span className="font-medium">Lượng đá</span>
+                  <span className="text-amber-800 font-semibold">
+                    {ice} {isIceOut && <span className="text-rose-600 font-normal">(Kho hết đá viên)</span>}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {ICE_OPTIONS.map((level) => {
+                    const isDisabled = isIceOut && level !== 'Không đá';
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setIce(level)}
+                        className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
+                          isDisabled
+                            ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                            : ice === level
+                              ? 'bg-amber-700 text-white border-amber-700'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {ICE_OPTIONS.map((level) => {
-                const requiredIce = standard.ice * (ICE_FACTORS[level] ?? 1.0) * quantity;
-                const isOutOfStock = level !== 'Không đá' && iceStock < requiredIce;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    disabled={isOutOfStock}
-                    onClick={() => !isOutOfStock && setIce(level)}
-                    className={`py-1.5 rounded-lg text-xs font-semibold border transition flex flex-col items-center justify-center ${
-                      isOutOfStock
-                        ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed opacity-60 line-through'
-                        : ice === level
-                        ? 'bg-amber-700 text-white border-amber-700'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                    title={isOutOfStock ? 'Hết đá trong kho' : undefined}
-                  >
-                    <span>{level}</span>
-                    {isOutOfStock && <span className="text-[9px] text-red-500 font-normal no-underline">Hết hàng</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* 4. Bảng tính giá theo tùy chọn thời gian thực (Task 4) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 space-y-2.5 text-xs text-stone-600">

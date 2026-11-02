@@ -20,6 +20,8 @@ export class ProductsService {
             price: p.price,
             image: p.imageUrl || '',
             description: p.description ?? undefined,
+            stock: p.stock,
+            isAvailable: p.isAvailable && p.stock > 0,
           }));
         }
       }
@@ -33,6 +35,8 @@ export class ProductsService {
         price: 25000,
         image: '/images/coffee1.png',
         description: 'Cà phê Robusta rang đậm nguyên chất mang hương vị truyền thống.',
+        stock: 50,
+        isAvailable: true,
       },
       {
         id: 2,
@@ -40,6 +44,8 @@ export class ProductsService {
         price: 29000,
         image: '/images/coffee2.png',
         description: 'Sự hòa quyện hoàn hảo giữa cà phê đậm đà và sữa đặc ngọt béo.',
+        stock: 50,
+        isAvailable: true,
       },
       {
         id: 3,
@@ -47,6 +53,8 @@ export class ProductsService {
         price: 35000,
         image: '/images/tea1.png',
         description: 'Trà ô long thượng hạng kết hợp sữa tươi thanh béo.',
+        stock: 50,
+        isAvailable: true,
       },
       {
         id: 4,
@@ -54,6 +62,8 @@ export class ProductsService {
         price: 32000,
         image: '/images/coffee3.png',
         description: 'Nhiều sữa ít cà phê, béo ngậy ngọt ngào phù hợp mọi người.',
+        stock: 50,
+        isAvailable: true,
       },
     ];
   }
@@ -154,5 +164,4 @@ export class ProductsService {
       ing.stock = Math.max(0, newStock);
     }
   }
-
 }

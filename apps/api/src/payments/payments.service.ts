@@ -27,6 +27,38 @@ export class PaymentsService {
   }
 
 
+  private async deductProductStock(orderId: number) {
+    try {
+      const orderWithItems = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!orderWithItems || !orderWithItems.items) return;
+
+      for (const item of orderWithItems.items) {
+        try {
+          const product = await this.prisma.product.findUnique({
+            where: { id: item.productId },
+          });
+          if (product) {
+            const newStock = Math.max(0, product.stock - Number(item.qty || 1));
+            await this.prisma.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: newStock,
+                isAvailable: newStock > 0,
+              },
+            });
+          }
+        } catch (dbErr) {
+          console.warn(`Không thể trừ tồn kho DB cho sản phẩm #${item.productId}:`, dbErr);
+        }
+      }
+    } catch (err) {
+      console.warn('Không thể trừ tồn kho sản phẩm:', err);
+    }
+  }
+
   private async deductToppingStock(orderId: number) {
     try {
       // Dùng this.prisma trực tiếp (KHÔNG dùng tx) để tránh lỗi 25P02 khi transaction bị abort
@@ -108,9 +140,9 @@ export class PaymentsService {
         ProductsService.deductInMemoryIngredientStock('ICE', consumption.totalIceGrams);
       }
 
-      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (bảo đảm stock >= 0 không bị âm)
+      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (luôn đảm bảo stock >= 0)
       try {
-        if ((this.prisma as any)?.ingredient) {
+        if ((this.prisma as any)?.ingredient?.findUnique) {
           if (consumption.totalSugarGrams > 0) {
             const currentSugar = await (this.prisma as any).ingredient.findUnique({
               where: { code: 'SUGAR' },
@@ -250,6 +282,7 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (gatewayResult.success) {
+      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }
@@ -349,6 +382,7 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (verified.isSuccess) {
+      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }
@@ -459,6 +493,7 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (verified.isSuccess) {
+      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }
