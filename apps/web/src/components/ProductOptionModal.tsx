@@ -17,6 +17,12 @@ import {
   SIZE_PRICES,
   SWEETNESS_OPTIONS,
   ICE_OPTIONS,
+  SIZE_STANDARDS,
+  SWEETNESS_FACTORS,
+  ICE_FACTORS,
+  BASE_INGREDIENT_STANDARDS,
+  getProductBaseType,
+  getRecipeItem,
   calculateCustomizedPrice,
 } from '../data/coffeeProducts';
 import { useCartStore } from '../store/useCartStore';
@@ -43,58 +49,58 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
   const [specialNote, setSpecialNote] = useState<string>('');
   const [addedToast, setAddedToast] = useState<boolean>(false);
   const [toppingsList, setToppingsList] = useState<ToppingOption[]>(COFFEE_TOPPINGS);
-  const [ingredientsList, setIngredientsList] = useState<IngredientOption[]>([]);
+  const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     let isMounted = true;
-    const fetchData = async () => {
+    const fetchToppings = async () => {
       try {
-        const [toppingsRes, ingRes] = await Promise.all([
-          fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' }),
-          fetch(`${apiUrl}/products/ingredients`, { cache: 'no-store' }),
-        ]);
-
-        if (toppingsRes.ok) {
-          const list = await toppingsRes.json();
+        const res = await fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' });
+        if (res.ok) {
+          const list = await res.json();
           if (Array.isArray(list) && list.length > 0 && isMounted) {
             setToppingsList(list);
           }
         }
-
-        if (ingRes.ok) {
-          const ingData = await ingRes.json();
-          if (Array.isArray(ingData) && isMounted) {
-            setIngredientsList(ingData);
-
-            const iceIng = ingData.find((i: IngredientOption) => i.code === 'ICE');
-            if (iceIng && (iceIng.stock <= 0 || !iceIng.isAvailable)) {
-              setIce('Không đá');
-            }
-
-            const sugarIng = ingData.find((i: IngredientOption) => i.code === 'SUGAR');
-            if (sugarIng && (sugarIng.stock <= 0 || !sugarIng.isAvailable)) {
-              setSweetness('0%');
-            }
-          }
-        }
       } catch (err) {
-        console.warn('Không thể tải topping/nguyên liệu từ backend trong modal, dùng fallback:', err);
+        console.warn('Không thể tải topping từ backend trong modal, dùng fallback:', err);
       }
     };
-    fetchData();
+    fetchToppings();
     return () => {
       isMounted = false;
     };
   }, [apiUrl]);
 
-  const iceIngredient = ingredientsList.find((i) => i.code === 'ICE');
-  const isIceOutOfStock = Boolean(iceIngredient && (iceIngredient.stock <= 0 || !iceIngredient.isAvailable));
 
-  const sugarIngredient = ingredientsList.find((i) => i.code === 'SUGAR');
-  const isSugarOutOfStock = Boolean(sugarIngredient && (sugarIngredient.stock <= 0 || !sugarIngredient.isAvailable));
+  // Tính toán lượng nguyên liệu: Cà phê, Trà, Sữa, Đường, Đá còn lại trong kho
+  const sugarIngredient = ingredients.find((i) => i.code === 'SUGAR');
+  const iceIngredient = ingredients.find((i) => i.code === 'ICE');
+  const coffeeIngredient = ingredients.find((i) => i.code === 'COFFEE_BEANS');
+  const teaIngredient = ingredients.find((i) => i.code === 'TEA_LEAVES');
+  const milkIngredient = ingredients.find((i) => i.code === 'MILK');
 
+  const sugarStock = sugarIngredient ? sugarIngredient.stock : 999999;
+  const iceStock = iceIngredient ? iceIngredient.stock : 999999;
+  const coffeeStock = coffeeIngredient ? coffeeIngredient.stock : 999999;
+  const teaStock = teaIngredient ? teaIngredient.stock : 999999;
+  const milkStock = milkIngredient ? milkIngredient.stock : 999999;
+
+  const baseType = getProductBaseType(product?.name || '');
+
+  // Kiểm tra từng size dựa theo công thức RECIPE_STANDARDS chuẩn (Coffee, Tea, Milk)
+  const isSizeAvailable = (checkSize: ProductSize) => {
+    const recipe = getRecipeItem(product?.name, checkSize);
+    if (recipe.coffee > 0 && coffeeStock < recipe.coffee * quantity) return false;
+    if (recipe.tea > 0 && teaStock < recipe.tea * quantity) return false;
+    if (recipe.milk > 0 && milkStock < recipe.milk * quantity) return false;
+    return true;
+  };
+
+  const isCurrentProductSoldOut = !isSizeAvailable('S') && !isSizeAvailable('M') && !isSizeAvailable('L');
+  const standard = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
   const pricing = useMemo(() => {
     if (!product) return null;
     return calculateCustomizedPrice(product.price, size, selectedToppings, quantity);
@@ -102,6 +108,19 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
 
   if (!isOpen || !product || !pricing) return null;
 
+
+  // Tự động chuyển khẩu vị an toàn nếu mức đường hoặc đá hiện tại đã hết hàng
+  useEffect(() => {
+    const std = SIZE_STANDARDS[size] || SIZE_STANDARDS.M;
+    const reqSugar = std.sugar * (SWEETNESS_FACTORS[sweetness] ?? 1.0) * quantity;
+    if (sweetness !== '0%' && sugarStock < reqSugar) {
+      setSweetness('0%');
+    }
+    const reqIce = std.ice * (ICE_FACTORS[ice] ?? 1.0) * quantity;
+    if (ice !== 'Không đá' && iceStock < reqIce) {
+      setIce('Không đá');
+    }
+  }, [size, quantity, sugarStock, iceStock, sweetness, ice]);
   const handleToggleTopping = (topping: ToppingOption) => {
     setSelectedToppings((prev) => {
       const exists = prev.some((t) => t.id === topping.id);
@@ -239,28 +258,29 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-stone-600">
                 <span className="font-medium">Lượng đường</span>
-                <span className="text-amber-800 font-semibold">
-                  {sweetness} {isSugarOutOfStock && <span className="text-rose-600 font-normal">(Kho hết đường)</span>}
-                </span>
+                <span className="text-amber-800 font-semibold">{sweetness}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {SWEETNESS_OPTIONS.map((level) => {
-                  const isDisabled = isSugarOutOfStock && level !== '0%';
+                  const requiredSugar = standard.sugar * (SWEETNESS_FACTORS[level] ?? 1.0) * quantity;
+                  const isOutOfStock = level !== '0%' && sugarStock < requiredSugar;
                   return (
                     <button
                       key={level}
                       type="button"
-                      disabled={isDisabled}
-                      onClick={() => !isDisabled && setSweetness(level)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                        isDisabled
-                          ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                      disabled={isOutOfStock}
+                      onClick={() => !isOutOfStock && setSweetness(level)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition flex flex-col items-center justify-center ${
+                        isOutOfStock
+                          ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed opacity-60 line-through'
                           : sweetness === level
-                            ? 'bg-amber-700 text-white border-amber-700'
-                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                          ? 'bg-amber-700 text-white border-amber-700'
+                          : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                       }`}
+                      title={isOutOfStock ? 'Hết đường trong kho' : undefined}
                     >
-                      {level}
+                      <span>{level}</span>
+                      {isOutOfStock && <span className="text-[9px] text-red-500 font-normal no-underline">Hết</span>}
                     </button>
                   );
                 })}
@@ -271,28 +291,29 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             <div className="space-y-1.5 pt-2 border-t border-stone-50">
               <div className="flex justify-between text-xs text-stone-600">
                 <span className="font-medium">Lượng đá</span>
-                <span className="text-amber-800 font-semibold">
-                  {ice} {isIceOutOfStock && <span className="text-rose-600 font-normal">(Kho hết đá viên)</span>}
-                </span>
+                <span className="text-amber-800 font-semibold">{ice}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {ICE_OPTIONS.map((level) => {
-                  const isDisabled = isIceOutOfStock && level !== 'Không đá';
+                  const requiredIce = standard.ice * (ICE_FACTORS[level] ?? 1.0) * quantity;
+                  const isOutOfStock = level !== 'Không đá' && iceStock < requiredIce;
                   return (
                     <button
                       key={level}
                       type="button"
-                      disabled={isDisabled}
-                      onClick={() => !isDisabled && setIce(level)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                        isDisabled
-                          ? 'opacity-35 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                      disabled={isOutOfStock}
+                      onClick={() => !isOutOfStock && setIce(level)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition flex flex-col items-center justify-center ${
+                        isOutOfStock
+                          ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed opacity-60 line-through'
                           : ice === level
-                            ? 'bg-amber-700 text-white border-amber-700'
-                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                          ? 'bg-amber-700 text-white border-amber-700'
+                          : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                       }`}
+                      title={isOutOfStock ? 'Hết đá trong kho' : undefined}
                     >
-                      {level}
+                      <span>{level}</span>
+                      {isOutOfStock && <span className="text-[9px] text-red-500 font-normal no-underline">Hết hàng</span>}
                     </button>
                   );
                 })}
@@ -313,23 +334,16 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              {toppingsList.map((topping) => {
-                const isOutOfStock = topping.isAvailable === false || (typeof topping.stock === 'number' && topping.stock <= 0);
+              {COFFEE_TOPPINGS.map((topping) => {
                 const isChecked = selectedToppings.some((t) => t.id === topping.id);
                 return (
                   <label
                     key={topping.id}
-                    onClick={() => {
-                      if (!isOutOfStock) {
-                        handleToggleTopping(topping);
-                      }
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-xl border select-none transition ${
-                      isOutOfStock
-                        ? 'opacity-40 bg-stone-50 border-stone-200 cursor-not-allowed'
-                        : isChecked
-                          ? 'border-amber-700 bg-amber-50/60 cursor-pointer'
-                          : 'border-stone-200 hover:bg-stone-50 bg-white cursor-pointer'
+                    onClick={() => handleToggleTopping(topping)}
+                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition select-none ${
+                      isChecked
+                        ? 'border-amber-700 bg-amber-50/60'
+                        : 'border-stone-200 hover:bg-stone-50 bg-white'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -343,7 +357,7 @@ export const ProductOptionModal: React.FC<ProductOptionModalProps> = ({
                         {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                       <span className="text-xs font-medium text-stone-800">
-                        {topping.name} {isOutOfStock && <span className="text-rose-600 font-normal">(Hết hàng)</span>}
+                        {topping.name}
                       </span>
                     </div>
                     <span className="text-xs font-bold text-amber-900">

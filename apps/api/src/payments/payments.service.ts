@@ -27,39 +27,12 @@ export class PaymentsService {
   }
 
 
-  private async deductProductStock(orderId: number) {
-    try {
-      const orderWithItems = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        include: { items: true },
-      });
-      if (!orderWithItems || !orderWithItems.items) return;
-
-      for (const item of orderWithItems.items) {
-        try {
-          const product = await this.prisma.product.findUnique({
-            where: { id: item.productId },
-          });
-          if (product) {
-            const newStock = Math.max(0, product.stock - Number(item.qty || 1));
-            await this.prisma.product.update({
-              where: { id: item.productId },
-              data: {
-                stock: newStock,
-                isAvailable: newStock > 0,
-              },
-            });
-          }
-        } catch (dbErr) {
-          console.warn(`Không thể trừ tồn kho DB cho sản phẩm #${item.productId}:`, dbErr);
-        }
-      }
-    } catch (err) {
-      console.warn('Không thể trừ tồn kho sản phẩm:', err);
-    }
-  }
-
   private async deductToppingStock(orderId: number) {
+    if (ProductsService.isToppingDeducted(orderId)) {
+      return;
+    }
+    ProductsService.markToppingDeducted(orderId);
+
     try {
       // Dùng this.prisma trực tiếp (KHÔNG dùng tx) để tránh lỗi 25P02 khi transaction bị abort
       const orderWithItems = await this.prisma.order.findUnique({
@@ -115,16 +88,29 @@ export class PaymentsService {
    * sugarused = sugarstandarsize * sugarlevel
    * iceused = icestandersize * icelevel
    */
+  /**
+   * Khấu trừ lượng nguyên liệu: Đường, Đá, Cà phê, Trà dựa trên công thức chuẩn và khẩu vị của khách:
+   * sugarused = sugarstandarsize * sugarlevel
+   * iceused = icestandersize * icelevel
+   * baseIngredient = coffee/tea standard size * qty
+   */
   private async deductSugarAndIceStock(orderId: number) {
+    if (ProductsService.isSugarIceDeducted(orderId)) {
+      return;
+    }
+    ProductsService.markSugarIceDeducted(orderId);
+
     try {
       const orderWithItems = await this.prisma.order.findUnique({
         where: { id: orderId },
-        include: { items: true },
+        include: { items: { include: { product: true } } },
       });
       if (!orderWithItems || !orderWithItems.items || orderWithItems.items.length === 0) return;
 
       const consumption = calculateSugarAndIceConsumption(
         orderWithItems.items.map((item: any) => ({
+          productId: item.productId,
+          productName: item.product?.name || String(item.productId),
           size: item.size,
           sweetness: item.sweetness,
           ice: item.ice,
@@ -139,44 +125,48 @@ export class PaymentsService {
       if (consumption.totalIceGrams > 0) {
         ProductsService.deductInMemoryIngredientStock('ICE', consumption.totalIceGrams);
       }
+      if (consumption.totalCoffeeGrams > 0) {
+        ProductsService.deductInMemoryIngredientStock('COFFEE_BEANS', consumption.totalCoffeeGrams);
+      }
+      if (consumption.totalTeaGrams > 0) {
+        ProductsService.deductInMemoryIngredientStock('TEA_LEAVES', consumption.totalTeaGrams);
+      }
+      if (consumption.totalMilkMl > 0) {
+        ProductsService.deductInMemoryIngredientStock('MILK', consumption.totalMilkMl);
+      }
 
-      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (luôn đảm bảo stock >= 0)
+      // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (bảo đảm stock >= 0 không bị âm)
       try {
-        if ((this.prisma as any)?.ingredient?.findUnique) {
-          if (consumption.totalSugarGrams > 0) {
-            const currentSugar = await (this.prisma as any).ingredient.findUnique({
-              where: { code: 'SUGAR' },
+        if ((this.prisma as any)?.ingredient) {
+          const deductDb = async (code: string, amount: number) => {
+            if (amount <= 0) return;
+            const current = await (this.prisma as any).ingredient.findUnique({
+              where: { code },
             });
-            if (currentSugar) {
-              const newSugarStock = Math.max(0, Math.round((currentSugar.stock - consumption.totalSugarGrams) * 10) / 10);
+            if (current) {
+              const newStock = Math.max(0, Math.round((current.stock - amount) * 10) / 10);
               await (this.prisma as any).ingredient.update({
-                where: { code: 'SUGAR' },
-                data: { stock: newSugarStock },
+                where: { code },
+                data: { stock: newStock },
               });
             }
-          }
-          if (consumption.totalIceGrams > 0) {
-            const currentIce = await (this.prisma as any).ingredient.findUnique({
-              where: { code: 'ICE' },
-            });
-            if (currentIce) {
-              const newIceStock = Math.max(0, Math.round((currentIce.stock - consumption.totalIceGrams) * 10) / 10);
-              await (this.prisma as any).ingredient.update({
-                where: { code: 'ICE' },
-                data: { stock: newIceStock },
-              });
-            }
-          }
+          };
+
+          await deductDb('SUGAR', consumption.totalSugarGrams);
+          await deductDb('ICE', consumption.totalIceGrams);
+          await deductDb('COFFEE_BEANS', consumption.totalCoffeeGrams);
+          await deductDb('TEA_LEAVES', consumption.totalTeaGrams);
+          await deductDb('MILK', consumption.totalMilkMl);
         }
       } catch (dbErr) {
-        console.warn('Không thể trừ tồn kho Đường/Đá trong DB (in-memory đã trừ):', dbErr);
+        console.warn('Không thể trừ tồn kho nguyên liệu trong DB (in-memory đã trừ):', dbErr);
       }
     } catch (err) {
-      console.warn('Lỗi khi tính toán và trừ tồn kho Đường/Đá:', err);
+      console.warn('Lỗi khi tính toán và trừ tồn kho nguyên liệu:', err);
     }
   }
 
-  async processPayment(dto: CreatePaymentDto) {
+    async processPayment(dto: CreatePaymentDto) {
     if (!dto.idempotencyKey || typeof dto.idempotencyKey !== 'string' || !dto.idempotencyKey.trim()) {
       throw new BadRequestException('Idempotency key không được để trống hoặc chỉ chứa khoảng trắng');
     }
@@ -282,7 +272,6 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (gatewayResult.success) {
-      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }
@@ -382,7 +371,6 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (verified.isSuccess) {
-      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }
@@ -493,7 +481,6 @@ export class PaymentsService {
 
     // Trừ tồn kho topping, đường & đá SAU khi transaction hoàn tất — tránh lỗi 25P02
     if (verified.isSuccess) {
-      await this.deductProductStock(order.id);
       await this.deductToppingStock(order.id);
       await this.deductSugarAndIceStock(order.id);
     }

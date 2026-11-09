@@ -27,6 +27,7 @@ function ZalopayReturnContent(): React.JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [result, setResult] = useState<VerifyZaloResult | null>(null);
   const [countdown, setCountdown] = useState<number>(4);
+  const hasCalledInitialVerify = React.useRef(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -63,6 +64,8 @@ function ZalopayReturnContent(): React.JSX.Element {
   }, [searchParams, apiUrl, clearCart]);
 
   useEffect(() => {
+    if (hasCalledInitialVerify.current) return;
+    hasCalledInitialVerify.current = true;
     void verifyPayment();
   }, [verifyPayment]);
 
