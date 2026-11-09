@@ -6,6 +6,7 @@ import { PercentageDiscountStrategy } from '../promotions/strategies/percentage-
 import { FixedDiscountStrategy } from '../promotions/strategies/fixed-discount.strategy.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
 import { LoyaltyPointsService } from '../promotions/loyalty.service.js';
+import { ProductsService } from '../products/products.service.js';
 import { DiscountType } from '@prisma/client';
 
 describe('OrdersService - Pricing, Promotions & Loyalty Points (Task 10.3)', () => {
@@ -191,5 +192,122 @@ describe('OrdersService - Pricing, Promotions & Loyalty Points (Task 10.3)', () 
         1,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  describe('Hủy đơn hàng & Hoàn tồn kho (Order Cancellation & Restock)', () => {
+    it('khi đơn hàng ở trạng thái PAID bị hủy -> hoàn lại tồn kho nguyên liệu và topping', async () => {
+      const initialCoffee = ProductsService.getInMemoryIngredientStock('COFFEE_BEANS');
+      const initialMilk = ProductsService.getInMemoryIngredientStock('MILK');
+      const initialSugar = ProductsService.getInMemoryIngredientStock('SUGAR');
+
+      // Giả lập đơn hàng #200 đang ở trạng thái PAID với 1 Cà phê sữa size M, 100% đường, có trân châu đen
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 200,
+        userId: 1,
+        status: 'PAID',
+        subtotal: 35000,
+        discountAmount: 0,
+        total: 35000,
+        pointsEarned: 3,
+        items: [
+          {
+            id: 1,
+            productId: 1,
+            qty: 1,
+            size: 'M',
+            sweetness: '100%',
+            ice: 'Bình thường',
+            toppings: ['Trân châu đen'],
+            product: { name: 'Cà phê sữa' },
+          },
+        ],
+      });
+
+      prismaMock.order.update.mockResolvedValue({
+        id: 200,
+        userId: 1,
+        status: 'CANCELLED',
+        total: 35000,
+        items: [],
+        updatedAt: new Date(),
+      });
+
+      prismaMock.topping = {
+        findFirst: vi.fn().mockResolvedValue({ id: 1, name: 'Trân châu đen', stock: 10 }),
+        update: vi.fn().mockResolvedValue({ id: 1, stock: 11 }),
+      };
+
+      prismaMock.ingredient = {
+        findUnique: vi.fn().mockImplementation(({ where }) => {
+          if (where.code === 'COFFEE_BEANS') return Promise.resolve({ code: 'COFFEE_BEANS', stock: 1000 });
+          if (where.code === 'MILK') return Promise.resolve({ code: 'MILK', stock: 2000 });
+          if (where.code === 'SUGAR') return Promise.resolve({ code: 'SUGAR', stock: 3000 });
+          if (where.code === 'ICE') return Promise.resolve({ code: 'ICE', stock: 4000 });
+          return Promise.resolve(null);
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      };
+
+      const result = await ordersService.transitionOrderStatus('ORD-200', 'CANCELLED' as any);
+
+      expect(result.status).toBe('CANCELLED');
+
+      // Kiểm tra tồn kho in-memory được hoàn lại:
+      // Cà phê sữa size M: 22g cà phê, 40ml sữa, đường 100% (35g)
+      expect(ProductsService.getInMemoryIngredientStock('COFFEE_BEANS')).toBe(initialCoffee + 22);
+      expect(ProductsService.getInMemoryIngredientStock('MILK')).toBe(initialMilk + 40);
+      expect(ProductsService.getInMemoryIngredientStock('SUGAR')).toBe(initialSugar + 35);
+
+      // Kiểm tra CSDL topping & ingredient được gọi update
+      expect(prismaMock.topping.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1 },
+          data: expect.objectContaining({ stock: 11 }),
+        }),
+      );
+      expect(prismaMock.ingredient.update).toHaveBeenCalled();
+    });
+
+    it('khi đơn hàng ở trạng thái PENDING bị hủy -> KHÔNG hoàn tồn kho (vì chưa từng bị trừ)', async () => {
+      const initialCoffee = ProductsService.getInMemoryIngredientStock('COFFEE_BEANS');
+
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 201,
+        userId: 1,
+        status: 'PENDING',
+        subtotal: 30000,
+        total: 30000,
+        items: [
+          {
+            id: 2,
+            productId: 1,
+            qty: 1,
+            size: 'S',
+            toppings: [],
+            product: { name: 'Americano' },
+          },
+        ],
+      });
+
+      prismaMock.order.update.mockResolvedValue({
+        id: 201,
+        status: 'CANCELLED',
+        total: 30000,
+        items: [],
+        updatedAt: new Date(),
+      });
+
+      prismaMock.ingredient = {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      };
+
+      await ordersService.transitionOrderStatus('ORD-201', 'CANCELLED' as any);
+
+      // Tồn kho in-memory không thay đổi
+      expect(ProductsService.getInMemoryIngredientStock('COFFEE_BEANS')).toBe(initialCoffee);
+      // DB ingredient không bị gọi update
+      expect(prismaMock.ingredient.update).not.toHaveBeenCalled();
+    });
   });
 });

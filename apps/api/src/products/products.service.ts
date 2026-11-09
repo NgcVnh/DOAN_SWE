@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Products } from './Interfaces/product.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
-  BASE_INGREDIENT_STANDARDS,
-  getProductBaseType,
+  RECIPE_STANDARDS,
+  getProductRecipeCode,
+  getRecipeItem,
 } from './sugar-ice.calculator.js';
 
 @Injectable()
@@ -23,7 +24,41 @@ export class ProductsService {
     { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },
     { code: 'COFFEE_BEANS', name: 'Hạt cà phê Robusta rang mộc', stock: 5000, unit: 'g', minThreshold: 500 }, // 5kg
     { code: 'TEA_LEAVES', name: 'Lá trà Oolong & Trà đen khô', stock: 3000, unit: 'g', minThreshold: 300 },   // 3kg
+    { code: 'MILK', name: 'Sữa tươi & Sữa đặc pha chế', stock: 10000, unit: 'ml', minThreshold: 1000 },      // 10 lít
   ];
+
+  // Theo dõi các đơn hàng đã trừ tồn kho / hoàn tồn kho để đảm bảo Idempotent (chống trừ lặp / hoàn lặp)
+  private static readonly deductedSugarIceOrders = new Set<number>();
+  private static readonly deductedToppingOrders = new Set<number>();
+  private static readonly restoredStockOrders = new Set<number>();
+
+  static isSugarIceDeducted(orderId: number): boolean {
+    return ProductsService.deductedSugarIceOrders.has(orderId);
+  }
+
+  static markSugarIceDeducted(orderId: number): void {
+    ProductsService.deductedSugarIceOrders.add(orderId);
+    ProductsService.restoredStockOrders.delete(orderId);
+  }
+
+  static isToppingDeducted(orderId: number): boolean {
+    return ProductsService.deductedToppingOrders.has(orderId);
+  }
+
+  static markToppingDeducted(orderId: number): void {
+    ProductsService.deductedToppingOrders.add(orderId);
+    ProductsService.restoredStockOrders.delete(orderId);
+  }
+
+  static isStockRestored(orderId: number): boolean {
+    return ProductsService.restoredStockOrders.has(orderId);
+  }
+
+  static markStockRestored(orderId: number): void {
+    ProductsService.restoredStockOrders.add(orderId);
+    ProductsService.deductedSugarIceOrders.delete(orderId);
+    ProductsService.deductedToppingOrders.delete(orderId);
+  }
 
   /**
    * Kiểm tra một sản phẩm có đủ nguyên liệu tối thiểu (Size S) để bán hay không
@@ -32,27 +67,28 @@ export class ProductsService {
     productName: string,
     coffeeStock: number,
     teaStock: number,
+    milkStock: number = 999999,
   ): boolean {
-    const baseType = getProductBaseType(productName);
-    if (baseType === 'COFFEE') {
-      return coffeeStock >= BASE_INGREDIENT_STANDARDS.S.coffee;
-    }
-    if (baseType === 'TEA') {
-      return teaStock >= BASE_INGREDIENT_STANDARDS.S.tea;
-    }
+    const recipeS = getRecipeItem(productName, 'S');
+    if (recipeS.coffee > 0 && coffeeStock < recipeS.coffee) return false;
+    if (recipeS.tea > 0 && teaStock < recipeS.tea) return false;
+    if (recipeS.milk > 0 && milkStock < recipeS.milk) return false;
     return true;
   }
 
   async findAll(): Promise<Products[]> {
     let coffeeStock = ProductsService.getInMemoryIngredientStock('COFFEE_BEANS');
     let teaStock = ProductsService.getInMemoryIngredientStock('TEA_LEAVES');
+    let milkStock = ProductsService.getInMemoryIngredientStock('MILK');
 
     try {
       if (this.prisma?.isConnected !== false && (this.prisma as any)?.ingredient?.findUnique) {
         const cRecord = await (this.prisma as any).ingredient.findUnique({ where: { code: 'COFFEE_BEANS' } });
         const tRecord = await (this.prisma as any).ingredient.findUnique({ where: { code: 'TEA_LEAVES' } });
+        const mRecord = await (this.prisma as any).ingredient.findUnique({ where: { code: 'MILK' } });
         if (cRecord) coffeeStock = cRecord.stock;
         if (tRecord) teaStock = tRecord.stock;
+        if (mRecord) milkStock = mRecord.stock;
       }
     } catch {
       // In-memory fallback
@@ -70,6 +106,7 @@ export class ProductsService {
               p.name,
               coffeeStock,
               teaStock,
+              milkStock,
             );
             return {
               id: p.id,
@@ -118,7 +155,7 @@ export class ProductsService {
 
     return fallbackProducts.map((p) => ({
       ...p,
-      isAvailable: ProductsService.isProductAvailableByStock(p.name, coffeeStock, teaStock),
+      isAvailable: ProductsService.isProductAvailableByStock(p.name, coffeeStock, teaStock, milkStock),
     }));
   }
 
@@ -159,6 +196,16 @@ export class ProductsService {
     }
   }
 
+  static restoreInMemoryToppingStock(name: string, quantity: number) {
+    const item = ProductsService.inMemoryToppings.find(
+      (t) => t.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+    if (item) {
+      item.stock += quantity;
+      item.isAvailable = item.stock > 0;
+    }
+  }
+
   async findAllIngredients() {
     try {
       if (this.prisma?.isConnected !== false && (this.prisma as any)?.ingredient?.findMany) {
@@ -188,24 +235,34 @@ export class ProductsService {
   }
 
   static deductInMemoryIngredientStock(
-    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
-    amountGrams: number,
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | 'MILK' | string,
+    amountGramsOrMl: number,
   ) {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
     if (ing) {
-      ing.stock = Math.max(0, Math.round((ing.stock - amountGrams) * 10) / 10);
+      ing.stock = Math.max(0, Math.round((ing.stock - amountGramsOrMl) * 10) / 10);
+    }
+  }
+
+  static restoreInMemoryIngredientStock(
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | 'MILK' | string,
+    amountGramsOrMl: number,
+  ) {
+    const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
+    if (ing) {
+      ing.stock = Math.round((ing.stock + amountGramsOrMl) * 10) / 10;
     }
   }
 
   static getInMemoryIngredientStock(
-    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | 'MILK' | string,
   ): number {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);
     return ing ? ing.stock : 999999;
   }
 
   static setInMemoryIngredientStock(
-    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | string,
+    code: 'SUGAR' | 'ICE' | 'COFFEE_BEANS' | 'TEA_LEAVES' | 'MILK' | string,
     newStock: number,
   ) {
     const ing = ProductsService.inMemoryIngredients.find((i) => i.code === code);

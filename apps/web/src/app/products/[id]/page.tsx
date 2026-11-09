@@ -30,6 +30,7 @@ import {
   ICE_FACTORS,
   BASE_INGREDIENT_STANDARDS,
   getProductBaseType,
+  getRecipeItem,
   calculateCustomizedPrice,
 } from '../../../data/coffeeProducts';
 import { useCartStore } from '../../../store/useCartStore';
@@ -117,25 +118,30 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
 
-  // Tính toán lượng nguyên liệu cốt (Cà phê, Trà) và Đường, Đá còn lại trong kho
+  // Tính toán lượng nguyên liệu: Cà phê, Trà, Sữa, Đường, Đá còn lại trong kho
   const sugarIngredient = ingredients.find((i) => i.code === 'SUGAR');
   const iceIngredient = ingredients.find((i) => i.code === 'ICE');
   const coffeeIngredient = ingredients.find((i) => i.code === 'COFFEE_BEANS');
   const teaIngredient = ingredients.find((i) => i.code === 'TEA_LEAVES');
+  const milkIngredient = ingredients.find((i) => i.code === 'MILK');
 
   const sugarStock = sugarIngredient ? sugarIngredient.stock : 999999;
   const iceStock = iceIngredient ? iceIngredient.stock : 999999;
   const coffeeStock = coffeeIngredient ? coffeeIngredient.stock : 999999;
   const teaStock = teaIngredient ? teaIngredient.stock : 999999;
+  const milkStock = milkIngredient ? milkIngredient.stock : 999999;
 
   const baseType = getProductBaseType(product?.name || '');
-  const availableBaseStock = baseType === 'TEA' ? teaStock : coffeeStock;
-  const baseIngredientName = baseType === 'TEA' ? 'lá trà' : 'cà phê';
+  const baseIngredientName = baseType === 'TEA' ? 'lá trà' : 'cà phê/sữa';
+  const currentRecipe = getRecipeItem(product?.name, size);
 
+  // Kiểm tra từng size dựa theo công thức RECIPE_STANDARDS chuẩn (Coffee, Tea, Milk)
   const isSizeAvailable = (checkSize: ProductSize) => {
-    const std = BASE_INGREDIENT_STANDARDS[checkSize] || BASE_INGREDIENT_STANDARDS.M;
-    const reqBase = (baseType === 'TEA' ? std.tea : std.coffee) * quantity;
-    return availableBaseStock >= reqBase;
+    const recipe = getRecipeItem(product?.name, checkSize);
+    if (recipe.coffee > 0 && coffeeStock < recipe.coffee * quantity) return false;
+    if (recipe.tea > 0 && teaStock < recipe.tea * quantity) return false;
+    if (recipe.milk > 0 && milkStock < recipe.milk * quantity) return false;
+    return true;
   };
 
   const isCurrentProductSoldOut = !isSizeAvailable('S') && !isSizeAvailable('M') && !isSizeAvailable('L');

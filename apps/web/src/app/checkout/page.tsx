@@ -48,6 +48,7 @@ function CheckoutContent(): React.JSX.Element {
 
   const [method, setMethod] = useState<PaymentMethodType>('WALLET');
   const [loading, setLoading] = useState<boolean>(false);
+  const isSubmittingRef = React.useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [orderPaidResult, setOrderPaidResult] = useState<OrderPaidResult | null>(null);
   const [activeOrderCode, setActiveOrderCode] = useState<string | null>(retryOrderCode);
@@ -156,11 +157,13 @@ function CheckoutContent(): React.JSX.Element {
   };
 
   const handleConfirmPayment = async (): Promise<void> => {
+    if (isSubmittingRef.current || loading) return;
     if (baseSubtotal <= 0) {
       setErrorMessage('Giỏ hàng của bạn đang trống. Vui lòng chọn món trước khi thanh toán.');
       return;
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
     setErrorMessage(null);
 
@@ -318,6 +321,7 @@ function CheckoutContent(): React.JSX.Element {
       setErrorMessage(msg);
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

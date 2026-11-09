@@ -76,7 +76,8 @@ async function main() {
     { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 }, // 20 kg
     { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },
     { code: 'COFFEE_BEANS', name: 'Hạt cà phê Robusta rang mộc', stock: 5000, unit: 'g', minThreshold: 500 }, // 5 kg
-    { code: 'TEA_LEAVES', name: 'Lá trà Oolong & Trà đen khô', stock: 3000, unit: 'g', minThreshold: 300 },   // 3 kg    // 50 kg
+    { code: 'TEA_LEAVES', name: 'Lá trà Oolong & Trà đen khô', stock: 3000, unit: 'g', minThreshold: 300 },
+    { code: 'MILK', name: 'Sữa tươi & Sữa đặc pha chế', stock: 10000, unit: 'ml', minThreshold: 1000 },   // 3 kg    // 50 kg
   ];
 
   for (const ing of ingredients) {

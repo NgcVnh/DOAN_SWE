@@ -22,6 +22,80 @@ export const SIZE_STANDARDS: Record<ProductSize, { sugar: number; ice: number }>
   M: { sugar: 35, ice: 200 },
   L: { sugar: 40, ice: 250 },
 };
+
+export type RecipeCode = 'AMERICANO' | 'CA_PHE_SUA' | 'CAPPUCCINO' | 'TRA_DAO' | 'TRA_SUA_OOLONG' | 'DEFAULT_COFFEE' | 'DEFAULT_TEA';
+
+export interface RecipeItem {
+  coffee: number; // gam hạt cà phê
+  tea: number;    // gam lá trà
+  milk: number;   // ml sữa
+  shots: number;  // số shot espresso
+}
+
+// Bảng định mức Recipe chuẩn theo mã món và size
+export const RECIPE_STANDARDS: Record<RecipeCode, Record<ProductSize, RecipeItem>> = {
+  AMERICANO: {
+    S: { coffee: 16, milk: 0, shots: 1, tea: 0 },
+    M: { coffee: 25, milk: 0, shots: 2, tea: 0 },
+    L: { coffee: 35, milk: 0, shots: 3, tea: 0 },
+  },
+  CA_PHE_SUA: {
+    S: { coffee: 18, milk: 30, shots: 1, tea: 0 },
+    M: { coffee: 22, milk: 40, shots: 1.5, tea: 0 },
+    L: { coffee: 28, milk: 50, shots: 2, tea: 0 },
+  },
+  CAPPUCCINO: {
+    S: { coffee: 14, milk: 120, shots: 1, tea: 0 },
+    M: { coffee: 18, milk: 150, shots: 1, tea: 0 },
+    L: { coffee: 24, milk: 180, shots: 2, tea: 0 },
+  },
+  TRA_DAO: {
+    S: { coffee: 0, milk: 0, shots: 0, tea: 10 },
+    M: { coffee: 0, milk: 0, shots: 0, tea: 15 },
+    L: { coffee: 0, milk: 0, shots: 0, tea: 20 },
+  },
+  TRA_SUA_OOLONG: {
+    S: { coffee: 0, milk: 40, shots: 0, tea: 12 },
+    M: { coffee: 0, milk: 60, shots: 0, tea: 16 },
+    L: { coffee: 0, milk: 80, shots: 0, tea: 22 },
+  },
+  DEFAULT_COFFEE: {
+    S: { coffee: 16, milk: 0, shots: 1, tea: 0 },
+    M: { coffee: 20, milk: 0, shots: 1.5, tea: 0 },
+    L: { coffee: 25, milk: 0, shots: 2, tea: 0 },
+  },
+  DEFAULT_TEA: {
+    S: { coffee: 0, milk: 0, shots: 0, tea: 10 },
+    M: { coffee: 0, milk: 0, shots: 0, tea: 15 },
+    L: { coffee: 0, milk: 0, shots: 0, tea: 20 },
+  },
+};
+
+export function getProductRecipeCode(nameOrId?: string | number | null): RecipeCode {
+  if (!nameOrId) return 'DEFAULT_COFFEE';
+  const str = String(nameOrId).toLowerCase().trim();
+
+  if (str.includes('americano')) return 'AMERICANO';
+  if (str.includes('cappuccino')) return 'CAPPUCCINO';
+  if (str.includes('cà phê sữa') || str.includes('cafe sữa') || str.includes('sữa đá') || str.includes('bạc xỉu')) {
+    return 'CA_PHE_SUA';
+  }
+  if (str.includes('đào cam sả')) return 'TRA_DAO';
+  if (str.includes('trà sữa') || str.includes('oolong nướng') || str.includes('ô long nướng')) {
+    return 'TRA_SUA_OOLONG';
+  }
+  if (str.includes('trà') || str.includes('tea') || str.includes('oolong') || str.includes('ô long')) {
+    return 'DEFAULT_TEA';
+  }
+  return 'DEFAULT_COFFEE';
+}
+
+export function getRecipeItem(nameOrId: string | number | null | undefined, size: ProductSize): RecipeItem {
+  const code = getProductRecipeCode(nameOrId);
+  const standards = RECIPE_STANDARDS[code] || RECIPE_STANDARDS.DEFAULT_COFFEE;
+  return standards[size] || standards.M;
+}
+
 // Định mức nguyên liệu cốt: Cà phê và Trà theo từng size (đơn vị: gram)
 export const BASE_INGREDIENT_STANDARDS: Record<ProductSize, { coffee: number; tea: number }> = {
   S: { coffee: 16, tea: 10 },

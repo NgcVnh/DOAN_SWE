@@ -28,6 +28,11 @@ export class PaymentsService {
 
 
   private async deductToppingStock(orderId: number) {
+    if (ProductsService.isToppingDeducted(orderId)) {
+      return;
+    }
+    ProductsService.markToppingDeducted(orderId);
+
     try {
       // Dùng this.prisma trực tiếp (KHÔNG dùng tx) để tránh lỗi 25P02 khi transaction bị abort
       const orderWithItems = await this.prisma.order.findUnique({
@@ -90,6 +95,11 @@ export class PaymentsService {
    * baseIngredient = coffee/tea standard size * qty
    */
   private async deductSugarAndIceStock(orderId: number) {
+    if (ProductsService.isSugarIceDeducted(orderId)) {
+      return;
+    }
+    ProductsService.markSugarIceDeducted(orderId);
+
     try {
       const orderWithItems = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -121,6 +131,9 @@ export class PaymentsService {
       if (consumption.totalTeaGrams > 0) {
         ProductsService.deductInMemoryIngredientStock('TEA_LEAVES', consumption.totalTeaGrams);
       }
+      if (consumption.totalMilkMl > 0) {
+        ProductsService.deductInMemoryIngredientStock('MILK', consumption.totalMilkMl);
+      }
 
       // 2. Cập nhật cơ sở dữ liệu nếu bảng ingredient tồn tại (bảo đảm stock >= 0 không bị âm)
       try {
@@ -143,6 +156,7 @@ export class PaymentsService {
           await deductDb('ICE', consumption.totalIceGrams);
           await deductDb('COFFEE_BEANS', consumption.totalCoffeeGrams);
           await deductDb('TEA_LEAVES', consumption.totalTeaGrams);
+          await deductDb('MILK', consumption.totalMilkMl);
         }
       } catch (dbErr) {
         console.warn('Không thể trừ tồn kho nguyên liệu trong DB (in-memory đã trừ):', dbErr);
