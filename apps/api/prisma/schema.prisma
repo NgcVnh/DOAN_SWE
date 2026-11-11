@@ -26,7 +26,6 @@ enum ProductSize {
 enum PaymentMethod {
   WALLET
   CARD
-  VNPAY
 }
 
 enum PaymentStatus {

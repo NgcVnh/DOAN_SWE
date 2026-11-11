@@ -5,7 +5,6 @@ import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { PaymentStrategy } from './strategies/payment-strategy.interface.js';
 import { WalletPaymentStrategy } from './strategies/wallet-payment.strategy.js';
 import { CardPaymentStrategy } from './strategies/card-payment.strategy.js';
-import { VnpayPaymentStrategy } from './strategies/vnpay-payment.strategy.js';
 import { ProductsService } from '../products/products.service.js';
 import { calculateSugarAndIceConsumption } from '../products/sugar-ice.calculator.js';
 
@@ -17,12 +16,10 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly walletStrategy: WalletPaymentStrategy,
     private readonly cardStrategy: CardPaymentStrategy,
-    private readonly vnpayStrategy: VnpayPaymentStrategy,
   ) {
     this.strategies = {
       [PaymentMethod.WALLET]: this.walletStrategy,
       [PaymentMethod.CARD]: this.cardStrategy,
-      [PaymentMethod.VNPAY]: this.vnpayStrategy,
     };
   }
 
@@ -287,7 +284,7 @@ export class PaymentsService {
   }
 
   async verifyVnpayReturn(query: Record<string, string>) {
-    const verified = this.vnpayStrategy.verifyReturn(query);
+    const verified = this.cardStrategy.verifyReturn(query);
     if (!verified.isValid) {
       throw new BadRequestException('Chữ ký xác thực VNPay không hợp lệ');
     }
