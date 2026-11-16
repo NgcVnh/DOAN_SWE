@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus as PrismaOrderStatus, ProductSize } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderStatus, DrinkSize } from './enums/order-status.enum.js';
@@ -132,6 +132,27 @@ export class OrdersService {
         );
       }
 
+      const toppingPriceMap = new Map<string, number>([
+        ['trân châu đen', 10000],
+        ['trân châu trắng', 10000],
+        ['kem cheese', 12000],
+        ['thạch nha đam', 8000],
+      ]);
+      try {
+        if ((tx as any)?.topping?.findMany) {
+          const dbToppings = await (tx as any).topping.findMany({
+            select: { name: true, price: true },
+          });
+          for (const t of dbToppings || []) {
+            if (t?.name && typeof t.price === 'number') {
+              toppingPriceMap.set(String(t.name).trim().toLowerCase(), t.price);
+            }
+          }
+        }
+      } catch {
+        // Fallback dùng bảng giá mặc định
+      }
+
       let calculatedSubtotal = 0;
       const orderItemsData = createOrderDto.items.map((item) => {
         const productId = Number(item.productId);
@@ -139,14 +160,14 @@ export class OrdersService {
         if (basePrice === undefined) {
           throw new BadRequestException(`Không tìm thấy sản phẩm #${productId}`);
         }
+        // Luôn tự tính đơn giá ở server (tránh client chỉnh sửa unitPrice)
         let unitPrice = basePrice;
-        if (typeof item.unitPrice === 'number' && item.unitPrice >= basePrice) {
-          unitPrice = item.unitPrice;
-        } else {
-          if (item.size === DrinkSize.M) unitPrice += 5000;
-          if (item.size === DrinkSize.L) unitPrice += 10000;
-          if (item.toppings && item.toppings.length > 0) {
-            unitPrice += item.toppings.length * 5000;
+        if (item.size === DrinkSize.M) unitPrice += 6000;
+        if (item.size === DrinkSize.L) unitPrice += 10000;
+        if (item.toppings && item.toppings.length > 0) {
+          for (const toppingName of item.toppings) {
+            const key = String(toppingName).trim().toLowerCase();
+            unitPrice += toppingPriceMap.get(key) ?? 5000;
           }
         }
         const lineTotal = unitPrice * item.quantity;
@@ -292,7 +313,7 @@ export class OrdersService {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async findByCode(orderCode: string): Promise<Order> {
+  async findByCode(orderCode: string, requesterUserId?: string | number): Promise<Order> {
     const orderId = orderCode.startsWith('ORD-') ? Number(orderCode.slice(4)) : Number(orderCode);
     if (Number.isInteger(orderId) && orderId > 0) {
       const dbOrder = await this.prisma.order.findUnique({
@@ -300,6 +321,12 @@ export class OrdersService {
         include: { items: { include: { product: true } } },
       });
       if (dbOrder) {
+        if (
+          requesterUserId !== undefined &&
+          String(dbOrder.userId) !== String(requesterUserId)
+        ) {
+          throw new ForbiddenException('Bạn không có quyền xem đơn hàng này');
+        }
         return {
           id: String(dbOrder.id),
           orderCode: `ORD-${dbOrder.id}`,
@@ -328,6 +355,12 @@ export class OrdersService {
     );
     if (!order) {
       throw new NotFoundException(`Không tìm thấy đơn hàng với mã: ${orderCode}`);
+    }
+    if (
+      requesterUserId !== undefined &&
+      String(order.userId) !== String(requesterUserId)
+    ) {
+      throw new ForbiddenException('Bạn không có quyền xem đơn hàng này');
     }
     return order;
   }

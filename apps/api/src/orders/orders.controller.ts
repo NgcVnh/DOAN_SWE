@@ -21,8 +21,9 @@ export class OrdersController {
   }
 
   @Get()
-  async getAllOrders(): Promise<Order[]> {
-    return this.ordersService.findAll();
+  @UseGuards(JwtAuthGuard)
+  async getAllOrders(@CurrentUser('id') userId: string): Promise<Order[]> {
+    return await this.ordersService.findByUserId(userId);
   }
 
   @Get('me')
@@ -35,8 +36,12 @@ export class OrdersController {
   }
 
   @Get(':orderCode')
-  async getOrder(@Param('orderCode') orderCode: string): Promise<Order> {
-    return await this.ordersService.findByCode(orderCode);
+  @UseGuards(JwtAuthGuard)
+  async getOrder(
+    @Param('orderCode') orderCode: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<Order> {
+    return await this.ordersService.findByCode(orderCode, userId);
   }
 
   @Patch(':orderCode/status')

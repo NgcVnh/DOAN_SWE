@@ -85,7 +85,10 @@ function CheckoutContent(): React.JSX.Element {
   useEffect(() => {
     if (!retryOrderCode || (retryAmountParam && Number(retryAmountParam) > 0)) return;
 
-    fetch(`${apiUrl}/orders/${encodeURIComponent(retryOrderCode)}`)
+    const token = getAuthToken();
+    fetch(`${apiUrl}/orders/${encodeURIComponent(retryOrderCode)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && typeof data === 'object') {

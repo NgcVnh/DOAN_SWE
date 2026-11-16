@@ -52,8 +52,10 @@ export default function OrderDetailPage(): React.JSX.Element {
     setError(null);
 
     try {
+      const token = getAuthToken();
       const response = await fetch(`${apiUrl}/orders/${encodeURIComponent(orderCode)}`, {
         cache: 'no-store',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
       if (!response.ok) {
