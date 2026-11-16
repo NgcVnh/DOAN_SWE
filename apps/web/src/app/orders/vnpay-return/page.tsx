@@ -26,10 +26,14 @@ function VnpayReturnContent(): React.JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [countdown, setCountdown] = useState<number>(4);
+  const hasCalledVerify = React.useRef(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
+    if (hasCalledVerify.current) return;
+    hasCalledVerify.current = true;
+
     const verifyPayment = async () => {
       try {
         const queryStr = searchParams.toString();

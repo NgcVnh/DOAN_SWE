@@ -12,7 +12,6 @@ export interface Product {
   price: number;
   image: string;
   description?: string;
-  stock?: number;
   isAvailable?: boolean;
 }
 
@@ -203,75 +202,87 @@ export default function Home() {
         {/* 3. Lưới sản phẩm */}
         {!loading && !error && products.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product) => {
-              const isOutOfStock = product.isAvailable === false || (typeof product.stock === 'number' && product.stock <= 0);
-
-              return (
-                <article
-                  key={product.id}
-                  className={`group flex flex-col bg-white rounded-2xl border shadow-sm transition overflow-hidden ${
-                    isOutOfStock
-                      ? 'border-stone-200 opacity-75'
-                      : 'border-stone-200/90 hover:shadow-md hover:border-amber-300'
-                  }`}
-                >
-                  <div className="relative h-48 w-full overflow-hidden bg-stone-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className={`h-full w-full object-cover transition duration-300 ${
-                        isOutOfStock ? 'grayscale-50' : 'group-hover:scale-105'
-                      }`}
-                      loading="lazy"
-                    />
-                    <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[11px] font-semibold px-2 py-0.5 rounded-md">
-                      #{product.id}
-                    </span>
-
-                    {isOutOfStock && (
-                      <span className="absolute top-2.5 right-2.5 bg-rose-600/90 backdrop-blur-xs text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs">
-                        Hết món
+            {products.map((product) => (
+              <article
+                key={product.id}
+                className={`group flex flex-col bg-white rounded-2xl border transition overflow-hidden ${
+                  product.isAvailable === false
+                    ? 'border-stone-200 opacity-75'
+                    : 'border-stone-200/90 shadow-sm hover:shadow-md hover:border-amber-300'
+                }`}
+              >
+                <div className="relative h-48 w-full overflow-hidden bg-stone-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className={`h-full w-full object-cover transition duration-300 ${
+                      product.isAvailable === false ? 'grayscale' : 'group-hover:scale-105'
+                    }`}
+                    loading="lazy"
+                  />
+                  <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                    #{product.id}
+                  </span>
+                  {product.isAvailable === false && (
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                      <span className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider">
+                        Tạm hết hàng
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
 
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-stone-900 text-base group-hover:text-amber-700 transition line-clamp-1">
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className={`font-bold text-base line-clamp-1 ${
+                        product.isAvailable === false ? 'text-stone-500 line-through' : 'text-stone-900 group-hover:text-amber-700'
+                      }`}>
                         {product.name}
                       </h3>
-                      <p className="text-xs text-stone-500 mt-1 line-clamp-2">
-                        {product.description || 'Thức uống được pha chế tỉ mỉ từ nguyên liệu tươi nguyên chất.'}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[11px] font-medium text-stone-400 block">Giá</span>
-                        <span className="text-base font-bold text-amber-700">
-                          {formatPrice(product.price)}
+                      {product.isAvailable === false && (
+                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded shrink-0">
+                          Hết
                         </span>
-                      </div>
-
-                      {isOutOfStock ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 text-stone-400 text-xs font-semibold cursor-not-allowed">
-                          Hết hàng
-                        </span>
-                      ) : (
-                        <Link
-                          href={`/products/${product.id}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition"
-                        >
-                          <span>Tùy chọn</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
                       )}
                     </div>
+                    <p className="text-xs text-stone-500 mt-1 line-clamp-2">
+                      {product.description || 'Thức uống được pha chế tỉ mỉ từ nguyên liệu tươi nguyên chất.'}
+                    </p>
                   </div>
-                </article>
-              );
-            })}
+
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-medium text-stone-400 block">Giá</span>
+                      <span className={`text-base font-bold ${
+                        product.isAvailable === false ? 'text-stone-400' : 'text-amber-700'
+                      }`}>
+                        {formatPrice(product.price)}
+                      </span>
+                    </div>
+
+                    {product.isAvailable === false ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-stone-200 text-stone-400 text-xs font-semibold cursor-not-allowed"
+                      >
+                        <span>Hết hàng</span>
+                      </button>
+                    ) : (
+                      <Link
+                        href={`/products/${product.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition"
+                      >
+                        <span>Tùy chọn</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </main>

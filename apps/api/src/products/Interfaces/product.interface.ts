@@ -3,7 +3,6 @@ export interface Products {
   name: string; 
   price: number; 
   image: string; 
-  description?: string; 
-  stock?: number;
+  description?: string;
   isAvailable?: boolean;
 }

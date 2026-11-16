@@ -1,3 +1,4 @@
+
 import { PrismaClient, DiscountType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -53,17 +54,6 @@ async function main() {
     const existing = await prisma.product.findFirst({ where: { name: p.name } });
     if (!existing) {
       await prisma.product.create({ data: p });
-    } else {
-      await prisma.product.update({
-        where: { id: existing.id },
-        data: {
-          price: p.price,
-          stock: p.stock,
-          isAvailable: p.isAvailable,
-          imageUrl: p.imageUrl,
-          description: p.description,
-        },
-      });
     }
   }
 
@@ -78,22 +68,16 @@ async function main() {
     const existing = await prisma.topping.findFirst({ where: { name: t.name } });
     if (!existing) {
       await prisma.topping.create({ data: t });
-    } else {
-      await prisma.topping.update({
-        where: { id: existing.id },
-        data: {
-          price: t.price,
-          stock: t.stock,
-          isAvailable: t.isAvailable,
-        },
-      });
     }
   }
 
   // Khởi tạo kho nguyên liệu: Đường & Đá (đơn vị: gram)
   const ingredients = [
     { code: 'SUGAR', name: 'Đường cát tinh luyện', stock: 20000, unit: 'g', minThreshold: 1000 }, // 20 kg
-    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },    // 50 kg
+    { code: 'ICE', name: 'Đá viên tinh khiết', stock: 50000, unit: 'g', minThreshold: 2000 },
+    { code: 'COFFEE_BEANS', name: 'Hạt cà phê Robusta rang mộc', stock: 5000, unit: 'g', minThreshold: 500 }, // 5 kg
+    { code: 'TEA_LEAVES', name: 'Lá trà Oolong & Trà đen khô', stock: 3000, unit: 'g', minThreshold: 300 },
+    { code: 'MILK', name: 'Sữa tươi & Sữa đặc pha chế', stock: 10000, unit: 'ml', minThreshold: 1000 },   // 3 kg    // 50 kg
   ];
 
   for (const ing of ingredients) {
@@ -102,16 +86,6 @@ async function main() {
     });
     if (!existing) {
       await prisma.ingredient.create({ data: ing });
-    } else {
-      await prisma.ingredient.update({
-        where: { id: existing.id },
-        data: {
-          name: ing.name,
-          stock: ing.stock,
-          unit: ing.unit,
-          minThreshold: ing.minThreshold,
-        },
-      });
     }
   }
 
@@ -193,3 +167,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
