@@ -25,4 +25,10 @@ export class PaymentsController {
   async getPaymentsByOrder(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.paymentsService.getPaymentsByOrderId(orderId);
   }
+
+  // Đặt sau các route tĩnh ('vnpay-return', 'zalopay-return', 'order/:orderId') để tránh xung đột với :id
+  @Get(':id')
+  async getPaymentById(@Param('id', ParseIntPipe) id: number) {
+    return this.paymentsService.getPaymentById(id);
+  }
 }

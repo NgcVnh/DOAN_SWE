@@ -505,4 +505,17 @@ export class PaymentsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /**
+   * Lấy thông tin chi tiết một giao dịch thanh toán theo ID.
+   */
+  async getPaymentById(id: number) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+    });
+    if (!payment) {
+      throw new NotFoundException(`Không tìm thấy giao dịch thanh toán #${id}`);
+    }
+    return payment;
+  }
 }
