@@ -23,9 +23,7 @@ export class PromotionsController {
     private readonly prisma: PrismaService,
   ) {}
 
-  /**
-   * Lấy danh sách các mã khuyến mãi công khai đang có hiệu lực
-   */
+
   @Get()
   async getAvailablePromotions() {
     const list = await this.promotionsService.getAvailablePromotions();
@@ -40,9 +38,7 @@ export class PromotionsController {
     }));
   }
 
-  /**
-   * Kiểm tra tính hợp lệ của mã khuyến mãi và tính trước số tiền giảm
-   */
+
   @Post('validate')
   @HttpCode(HttpStatus.OK)
   async validatePromotion(@Body() dto: ValidatePromotionDto) {
@@ -62,9 +58,6 @@ export class PromotionsController {
     };
   }
 
-  /**
-   * Tra cứu thông tin điểm thưởng của khách hàng hiện tại
-   */
   @Get('loyalty/me')
   @UseGuards(JwtAuthGuard)
   async getMyLoyaltySummary(@CurrentUser() user: any) {

@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 import { Products } from './Interfaces/product.interface.js';
 
@@ -19,5 +19,10 @@ export class ProductsController {
   @Get('ingredients')
   async findAllIngredients() {
     return this.productsService.findAllIngredients();
+  }
+
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Products> {
+    return this.productsService.findOne(id);
   }
 }

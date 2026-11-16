@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Products } from './Interfaces/product.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -11,7 +11,6 @@ import {
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Danh sách nguyên liệu trong bộ nhớ (In-memory fallback & đồng bộ DB)
   private static inMemoryToppings = [
     { id: 1, name: 'Trân châu đen', price: 10000, stock: 15, isAvailable: true },
     { id: 2, name: 'Trân châu trắng', price: 10000, stock: 0, isAvailable: false },
@@ -27,7 +26,6 @@ export class ProductsService {
     { code: 'MILK', name: 'Sữa tươi & Sữa đặc pha chế', stock: 10000, unit: 'ml', minThreshold: 1000 },      // 10 lít
   ];
 
-  // Theo dõi các đơn hàng đã trừ tồn kho / hoàn tồn kho để đảm bảo Idempotent (chống trừ lặp / hoàn lặp)
   private static readonly deductedSugarIceOrders = new Set<number>();
   private static readonly deductedToppingOrders = new Set<number>();
   private static readonly restoredStockOrders = new Set<number>();
@@ -60,9 +58,6 @@ export class ProductsService {
     ProductsService.deductedToppingOrders.delete(orderId);
   }
 
-  /**
-   * Kiểm tra một sản phẩm có đủ nguyên liệu tối thiểu (Size S) để bán hay không
-   */
   static isProductAvailableByStock(
     productName: string,
     coffeeStock: number,
@@ -91,7 +86,7 @@ export class ProductsService {
         if (mRecord) milkStock = mRecord.stock;
       }
     } catch {
-      // In-memory fallback
+
     }
 
     try {
@@ -157,6 +152,15 @@ export class ProductsService {
       ...p,
       isAvailable: ProductsService.isProductAvailableByStock(p.name, coffeeStock, teaStock, milkStock),
     }));
+  }
+
+  async findOne(id: number): Promise<Products> {
+    const products = await this.findAll();
+    const product = products.find((p) => p.id === id);
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm #${id}`);
+    }
+    return product;
   }
 
   async findAllToppings() {

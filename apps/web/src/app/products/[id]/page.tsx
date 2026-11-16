@@ -55,53 +55,61 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchProduct = async () => {
+
+    const fetchProductDetailData = async () => {
       setLoading(true);
-      try {
-        const res = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
-        if (res.ok) {
-          const list = await res.json();
-          const found = list.find((p: { id: number; name: string; price: number; image: string; description?: string }) => Number(p.id) === productId);
-          if (found && isMounted) {
-            setProduct({
-              id: found.id,
-              name: found.name,
-              price: found.price,
-              imageUrl: found.image,
-              description: found.description || 'Thức uống thơm ngon được pha chế tỉ mỉ từ nguyên liệu tươi nguyên chất.',
-              category: 'Đồ uống',
-            });
-            setLoading(false);
-            return;
-          }
+
+      const [productResult, toppingsResult, ingredientsResult] = await Promise.allSettled([
+        fetch(`${apiUrl}/products/${productId}`, { cache: 'no-store' }),
+        fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' }),
+        fetch(`${apiUrl}/products/ingredients`, { cache: 'no-store' }),
+      ]);
+
+      if (!isMounted) return;
+
+      let loadedProduct: ProductDetailItem | null = null;
+      if (productResult.status === 'fulfilled' && productResult.value.ok) {
+        const found = await productResult.value.json();
+        if (found && found.id) {
+          loadedProduct = {
+            id: found.id,
+            name: found.name,
+            price: found.price,
+            imageUrl: found.image,
+            description:
+              found.description ||
+              'Thức uống thơm ngon được pha chế tỉ mỉ từ nguyên liệu tươi nguyên chất.',
+            category: 'Đồ uống',
+          };
         }
-      } catch (err) {
-        console.warn('Không thể tải từ backend, dùng fallback:', err);
+      }
+
+      if (!loadedProduct) {
+        loadedProduct =
+          COFFEE_PRODUCTS.find((p) => p.id === productId) || COFFEE_PRODUCTS[0];
+      }
+      setProduct(loadedProduct);
+
+      if (toppingsResult.status === 'fulfilled' && toppingsResult.value.ok) {
+        const list = await toppingsResult.value.json();
+        if (Array.isArray(list) && list.length > 0 && isMounted) {
+          setToppingsList(list);
+        }
+      }
+
+      if (ingredientsResult.status === 'fulfilled' && ingredientsResult.value.ok) {
+        const list = await ingredientsResult.value.json();
+        if (Array.isArray(list) && isMounted) {
+          setIngredients(list);
+        }
       }
 
       if (isMounted) {
-        const fallback = COFFEE_PRODUCTS.find((p) => p.id === productId) || COFFEE_PRODUCTS[0];
-        setProduct(fallback);
         setLoading(false);
       }
     };
 
-    const fetchToppings = async () => {
-      try {
-        const res = await fetch(`${apiUrl}/products/toppings`, { cache: 'no-store' });
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list) && list.length > 0 && isMounted) {
-            setToppingsList(list);
-          }
-        }
-      } catch (err) {
-        console.warn('Không thể tải topping từ backend, dùng fallback:', err);
-      }
-    };
-
-    fetchProduct();
-    fetchToppings();
+    fetchProductDetailData();
     return () => {
       isMounted = false;
     };
